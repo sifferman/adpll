@@ -32,11 +32,11 @@ module tb_adpll_phase;
       .clk_o   (dco_clk)
   );
 
-  adpll_tdc #(.FracBits(FRAC)) u_tdc (
+  adpll_tdc #(.PhaseWidth(FRAC)) u_tdc (
       .clk_i    (clk),
       .rst_ni   (rst_n),
       .dco_clk_i(dco_clk),
-      .frac_o   (tdc_frac)
+      .phase_o  (tdc_frac)
   );
 
   adpll_controller_phase #(

@@ -34,14 +34,14 @@ module tb_adpll_csr;
   wire [NUM_TUNE-1:0] tune;
   wire                dco_clk;
 
-  adpll_csr #(.NumTuneBits(NUM_TUNE)) u_csr (
-      .clk_i(clk), .rst_ni(rst_n),
+  s_axi_adpll_csr #(.NumTuneBits(NUM_TUNE)) u_csr (
+      .clk(clk), .rst(~rst_n),
       .s_axil_awaddr(awaddr), .s_axil_awprot(3'b0), .s_axil_awvalid(awvalid), .s_axil_awready(awready),
       .s_axil_wdata(wdata), .s_axil_wstrb(4'hF), .s_axil_wvalid(wvalid), .s_axil_wready(wready),
       .s_axil_bresp(bresp), .s_axil_bvalid(bvalid), .s_axil_bready(bready),
       .s_axil_araddr(araddr), .s_axil_arprot(3'b0), .s_axil_arvalid(arvalid), .s_axil_arready(arready),
       .s_axil_rdata(rdata), .s_axil_rresp(rresp), .s_axil_rvalid(rvalid), .s_axil_rready(rready),
-      .enable_o(enable), .mul_o(mul), .div_o(div), .lock_i(lock), .tune_i(tune)
+      .enable(enable), .mul(mul), .div(div), .lock(lock), .tune(tune)
   );
 
   adpll_controller_bangbang #(.NumTuneBits(NUM_TUNE)) u_ctrl (

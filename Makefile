@@ -1,7 +1,10 @@
 # adpll — standalone all-digital ring-oscillator PLL IP. Self-contained Icarus sims (no PDK).
 # DCO SPICE characterization needs a PDK: pass PDK_ROOT/PDK/NGSPICE (see dco-spice).
 
-TS    = sim/_sim_timescale.v
+SHELL := /bin/bash
+# iverilog defaults to 1 s precision and rounds the behavioural #(1.0ns) delays to zero; set a
+# 1ns/1ps default timescale via an iverilog command file (process substitution -- no source stub).
+TS    = -c <(printf '+timescale+1ns/1ps\n')
 # Shared core + all controllers + all DCOs (single-PLL testbench picks one of each via plusdefines)
 CORE  = $(wildcard rtl/*.sv rtl/controller/*.sv rtl/dco/*.sv)
 NGSPICE ?= ngspice
@@ -48,7 +51,7 @@ sim-adpll-phase: ## Phase-domain ADPLL (TDC + reference/variable phase accumulat
 sim-adpll-csr: ## Single-PLL CSR: program mul/div/enable over AXI4-Lite, poll STATUS for lock
 	@mkdir -p sim_build
 	iverilog -g2012 -o sim_build/tb_adpll_csr $(TS) \
-		rtl/csr/adpll_csr.sv rtl/controller/adpll_controller_bangbang.sv rtl/adpll_freq_counter.sv \
+		rtl/csr/s_axi_adpll_csr.sv rtl/controller/adpll_controller_bangbang.sv rtl/adpll_freq_counter.sv \
 		rtl/adpll_lock_detect.sv rtl/dco/ring_dco_binary.sv sim/tb_adpll_csr.v
 	vvp sim_build/tb_adpll_csr | grep -E "CSR programmed|LOCKED|PASS|FAIL"
 

@@ -24,76 +24,76 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-// adpll_csr
+// s_axi_adpll_csr
 //
-// AXI4-Lite control/status register block for the on-chip ADPLL. A host sets the
-// synthesizer ratio (F_DCO = (mul/div)*F_clk_i) and enables the loop over Ethernet,
-// and reads back lock + the live tune code. Single outstanding transaction, same
-// handshake as axil_ram (its sibling on the fabric).
+// AXI4-Lite slave control/status registers for a single ADPLL. A host sets the synthesizer
+// ratio (F_DCO = (mul/div)*F_clk) and enables the loop, and reads back lock + the live tune
+// code. Single outstanding transaction. Port style follows alexforencich/verilog-axi
+// (clk/rst active-high, DATA/ADDR/STRB params, aligned s_axil_* signals).
 //
 // Register map (word-addressed, byte offsets):
 //   0x0 CTRL    [0]      enable          (R/W)
 //   0x4 MUL     [EdgeCountWidth-1:0] mul (N)  (R/W)
-//   0x8 DIV     [WindowSizeWidth-1:0]   div (M)  (R/W)
-//   0xC STATUS  [0] lock, [NumTuneBits:1] tune   (RO)
+//   0x8 DIV     [WindowSizeWidth-1:0] div (M) (R/W)
+//   0xC STATUS  [0] lock, [NumTuneBits:1] tune (RO)
 
-`default_nettype none
-
-module adpll_csr #(
-    parameter int unsigned AddrWidth   = 32,
-    parameter int unsigned NumTuneBits = 7,
+module s_axi_adpll_csr #(
+    // Width of data bus in bits
+    parameter  int unsigned DATA_WIDTH        = 32,
+    // Width of address bus in bits
+    parameter  int unsigned ADDR_WIDTH        = 32,
+    // Width of wstrb (width of data bus in words)
+    parameter  int unsigned STRB_WIDTH        = (DATA_WIDTH/8),
+    // DCO tune-code width
+    parameter  int unsigned NumTuneBits       = 7,
+    // Max DCO edges per window (sets the mul field width)
     parameter  int unsigned MaxEdgesPerWindow = (1 << 24) - 1,
     localparam int unsigned EdgeCountWidth    = $clog2(MaxEdgesPerWindow + 1),
+    // Max measurement window length (sets the div field width)
     parameter  int unsigned MaxWindowSize     = (1 << 16) - 1,
     localparam int unsigned WindowSizeWidth   = $clog2(MaxWindowSize + 1)
 ) (
-    input  wire                  clk_i,
-    input  wire                  rst_ni,
+    input  wire                   clk,
+    input  wire                   rst,
 
-    /*
-     * AXI-Lite slave interface
-     */
-    input  wire [AddrWidth-1:0]  s_axil_awaddr,
-    input  wire [2:0]            s_axil_awprot,
-    input  wire                  s_axil_awvalid,
-    output wire                  s_axil_awready,
-    input  wire [31:0]           s_axil_wdata,
-    input  wire [3:0]            s_axil_wstrb,
-    input  wire                  s_axil_wvalid,
-    output wire                  s_axil_wready,
-    output wire [1:0]            s_axil_bresp,
-    output wire                  s_axil_bvalid,
-    input  wire                  s_axil_bready,
-    input  wire [AddrWidth-1:0]  s_axil_araddr,
-    input  wire [2:0]            s_axil_arprot,
-    input  wire                  s_axil_arvalid,
-    output wire                  s_axil_arready,
-    output wire [31:0]           s_axil_rdata,
-    output wire [1:0]            s_axil_rresp,
-    output wire                  s_axil_rvalid,
-    input  wire                  s_axil_rready,
+    input  wire [ADDR_WIDTH-1:0]  s_axil_awaddr,
+    input  wire [2:0]             s_axil_awprot,
+    input  wire                   s_axil_awvalid,
+    output wire                   s_axil_awready,
+    input  wire [DATA_WIDTH-1:0]  s_axil_wdata,
+    input  wire [STRB_WIDTH-1:0]  s_axil_wstrb,
+    input  wire                   s_axil_wvalid,
+    output wire                   s_axil_wready,
+    output wire [1:0]             s_axil_bresp,
+    output wire                   s_axil_bvalid,
+    input  wire                   s_axil_bready,
+    input  wire [ADDR_WIDTH-1:0]  s_axil_araddr,
+    input  wire [2:0]             s_axil_arprot,
+    input  wire                   s_axil_arvalid,
+    output wire                   s_axil_arready,
+    output wire [DATA_WIDTH-1:0]  s_axil_rdata,
+    output wire [1:0]             s_axil_rresp,
+    output wire                   s_axil_rvalid,
+    input  wire                   s_axil_rready,
 
-    /*
-     * ADPLL control / status
-     */
-    output wire                   enable_o,
-    output wire [EdgeCountWidth-1:0]  mul_o,
-    output wire [WindowSizeWidth-1:0]    div_o,
-    input  wire                   lock_i,
-    input  wire [NumTuneBits-1:0] tune_i
+    output wire                   enable,
+    output wire [EdgeCountWidth-1:0]  mul,
+    output wire [WindowSizeWidth-1:0] div,
+    input  wire                   lock,
+    input  wire [NumTuneBits-1:0] tune
 );
 
-localparam int unsigned AddrLsb = 2;   // 32-bit registers
+localparam int unsigned AddrLsb = $clog2(STRB_WIDTH);   // byte-within-word address bits
 
-logic                  ctrl_q;          // CTRL[0] = enable
-logic [EdgeCountWidth-1:0] mul_q;
-logic [WindowSizeWidth-1:0]   div_q;
+logic                       ctrl_q;          // CTRL[0] = enable
+logic [EdgeCountWidth-1:0]  mul_q;
+logic [WindowSizeWidth-1:0] div_q;
 
 logic _unused;
 assign _unused = &{1'b0, s_axil_awprot, s_axil_arprot,
-                   s_axil_awaddr[AddrWidth-1:AddrLsb+2], s_axil_awaddr[AddrLsb-1:0],
-                   s_axil_araddr[AddrWidth-1:AddrLsb+2], s_axil_araddr[AddrLsb-1:0],
-                   s_axil_wdata[31:EdgeCountWidth], s_axil_wdata[31:WindowSizeWidth]};
+                   s_axil_awaddr[ADDR_WIDTH-1:AddrLsb+2], s_axil_awaddr[AddrLsb-1:0],
+                   s_axil_araddr[ADDR_WIDTH-1:AddrLsb+2], s_axil_araddr[AddrLsb-1:0],
+                   s_axil_wdata[DATA_WIDTH-1:EdgeCountWidth], s_axil_wdata[DATA_WIDTH-1:WindowSizeWidth]};
 
 // ---- write channel ----
 logic       bvalid_d, bvalid_q;
@@ -106,9 +106,9 @@ always_comb begin
     else if (s_axil_bready) bvalid_d = 1'b0;
 end
 
-logic                  ctrl_d;
-logic [EdgeCountWidth-1:0] mul_d;
-logic [WindowSizeWidth-1:0]   div_d;
+logic                       ctrl_d;
+logic [EdgeCountWidth-1:0]  mul_d;
+logic [WindowSizeWidth-1:0] div_d;
 always_comb begin
     ctrl_d = ctrl_q;
     mul_d  = mul_q;
@@ -123,8 +123,8 @@ always_comb begin
     end
 end
 
-always_ff @(posedge clk_i) begin
-    if (!rst_ni) begin
+always_ff @(posedge clk) begin
+    if (rst) begin
         bvalid_q <= 1'b0;
         ctrl_q   <= 1'b0;
         mul_q    <= '0;
@@ -143,12 +143,12 @@ assign s_axil_bvalid  = bvalid_q;
 assign s_axil_bresp   = 2'b00;
 
 // ---- read channel ----
-logic        rvalid_d, rvalid_q;
-logic [31:0] rdata_d, rdata_q;
-wire         read_accept = s_axil_arvalid && (!rvalid_q || s_axil_rready);
-wire [1:0]   read_index  = s_axil_araddr[AddrLsb +: 2];
+logic              rvalid_d, rvalid_q;
+logic [DATA_WIDTH-1:0] rdata_d, rdata_q;
+wire               read_accept = s_axil_arvalid && (!rvalid_q || s_axil_rready);
+wire [1:0]         read_index  = s_axil_araddr[AddrLsb +: 2];
 
-wire [31:0] status_word = {{(31-NumTuneBits){1'b0}}, tune_i, lock_i};
+wire [DATA_WIDTH-1:0] status_word = {{(DATA_WIDTH-1-NumTuneBits){1'b0}}, tune, lock};
 
 always_comb begin
     rvalid_d = rvalid_q;
@@ -160,16 +160,16 @@ always_comb begin
     rdata_d = rdata_q;
     if (read_accept) begin
         case (read_index)
-            2'd0:    rdata_d = {31'b0, ctrl_q};
-            2'd1:    rdata_d = {{(32-EdgeCountWidth){1'b0}}, mul_q};
-            2'd2:    rdata_d = {{(32-WindowSizeWidth){1'b0}}, div_q};
+            2'd0:    rdata_d = {{(DATA_WIDTH-1){1'b0}}, ctrl_q};
+            2'd1:    rdata_d = {{(DATA_WIDTH-EdgeCountWidth){1'b0}}, mul_q};
+            2'd2:    rdata_d = {{(DATA_WIDTH-WindowSizeWidth){1'b0}}, div_q};
             default: rdata_d = status_word;
         endcase
     end
 end
 
-always_ff @(posedge clk_i) begin
-    if (!rst_ni) begin
+always_ff @(posedge clk) begin
+    if (rst) begin
         rvalid_q <= 1'b0;
         rdata_q  <= '0;
     end else begin
@@ -183,10 +183,8 @@ assign s_axil_rdata   = rdata_q;
 assign s_axil_rvalid  = rvalid_q;
 assign s_axil_rresp   = 2'b00;
 
-assign enable_o = ctrl_q;
-assign mul_o    = mul_q;
-assign div_o    = div_q;
+assign enable = ctrl_q;
+assign mul    = mul_q;
+assign div    = div_q;
 
 endmodule
-
-`default_nettype wire

@@ -27,68 +27,63 @@
 // adpll_tdc
 //
 // Ref: Staszewski & Balsara (Wiley, 2006), Ch. 6 (time-to-digital converter, flash delay line).
-// Time-to-digital converter for the phase-domain ADPLL: at each reference edge (clk_i) it
-// measures how far into the current DCO period the reference fell -- the sub-cycle fractional
-// phase of dco_clk_i, in [0,1) scaled to 2^FracBits. The integer DCO phase is the edge count;
-// this fraction is what gives the loop sub-cycle resolution (Staszewski's normalized OTW).
-// SYNTHESIS = structural delay-line flash TDC (gf180 dlybuff chain sampled by dfxtp flops, then
-// a thermometer popcount); else a behavioural model reading the elapsed time directly.
+// Time-to-digital converter for the phase-domain ADPLL. At each reference edge (clk_i) it reports
+// how far into the current DCO period the reference fell -- the sub-cycle (fractional) phase of
+// dco_clk_i, in [0,1) scaled to 2^PhaseWidth. The integer DCO phase is the edge count; this
+// fractional phase is what gives the loop sub-cycle resolution (Staszewski's normalized OTW).
+// SYNTHESIS = a flash delay line of adpll_delay_cell taps sampled by reference-clocked flops,
+// then a thermometer popcount; else a behavioural model reading the elapsed time directly.
+// The only PDK-specific piece is adpll_delay_cell (the delay tap); the samplers are plain flops.
 //
 // Parameters:
-//   - FracBits : fractional-phase resolution; structural delay line is 2^FracBits-1 taps
+//   - PhaseWidth : fractional-phase resolution; the structural delay line is 2^PhaseWidth-1 taps
 // Ports:
-//   - clk_i      : reference clock (the instant whose DCO phase is measured)
-//   - rst_ni     : async-low reset (behavioural register only)
-//   - dco_clk_i  : DCO clock whose sub-cycle phase is measured
-//   - frac_o     : fractional DCO phase at the clk_i edge, in [0,1) * 2^FracBits
+//   - clk_i     : reference clock (the instant whose DCO phase is measured)
+//   - rst_ni    : async-low reset (behavioural register only)
+//   - dco_clk_i : DCO clock whose sub-cycle phase is measured
+//   - phase_o   : fractional DCO phase at the clk_i edge, in [0,1) * 2^PhaseWidth
 
 module adpll_tdc #(
-    parameter int unsigned FracBits = 6
+    parameter int unsigned PhaseWidth = 6
 ) (
-    input  wire                clk_i,
-    input  wire                rst_ni,
-    input  wire                dco_clk_i,
-    output wire [FracBits-1:0] frac_o
+    input  wire                  clk_i,
+    input  wire                  rst_ni,
+    input  wire                  dco_clk_i,
+    output wire [PhaseWidth-1:0] phase_o
 );
 
-localparam int unsigned NumTaps = (1 << FracBits) - 1;
+localparam int unsigned NumTaps = (1 << PhaseWidth) - 1;
 
 `ifdef SYNTHESIS
 
-// Flash TDC: the DCO edge propagates down a dlybuff delay line; the reference edge latches every
-// tap at once, so the count of taps the edge has reached = elapsed DCO time in delay-cell units.
+// Flash TDC: the DCO edge propagates down a delay line; the reference edge latches every tap at
+// once, so the count of taps the edge has reached = elapsed DCO time in delay-cell units.
 // NOTE: this is the raw delay-line count; a silicon build must back-annotate cell delays (SDF /
-// SPICE) and size the line so 2^FracBits-1 taps span one DCO period (true Staszewski TDCs also
-// measure the period and divide to normalise -- left as a follow-up).
+// SPICE) and size the line so 2^PhaseWidth-1 taps span one DCO period (a true Staszewski TDC also
+// measures the period and divides to normalise -- left as a follow-up).
 wire [NumTaps:0] tap;
 assign tap[0] = dco_clk_i;
 for (genvar i_GEN = 0; i_GEN < NumTaps; i_GEN++) begin : delay_line
-    (* keep *) (* dont_touch = "true" *)
-    gf180mcu_as_sc_mcu7t3v3__dlybuff_2 u_dly (
-        .A (tap[i_GEN]),
-        .Y (tap[i_GEN + 1])
+    adpll_delay_cell u_dly (
+        .a (tap[i_GEN]),
+        .z (tap[i_GEN + 1])
     );
 end
 
-wire [NumTaps-1:0] sampled;
-for (genvar i_GEN = 0; i_GEN < NumTaps; i_GEN++) begin : sampler
-    (* keep *) (* dont_touch = "true" *)
-    gf180mcu_as_sc_mcu7t3v3__dfxtp_2 u_ff (
-        .CLK (clk_i),
-        .D   (tap[i_GEN + 1]),
-        .Q   (sampled[i_GEN])
-    );
-end
+// Sample every tap on the reference edge (inferred flops; (* keep *) so they are not merged away).
+(* keep *) logic [NumTaps-1:0] sampled;
+always_ff @(posedge clk_i)
+    sampled <= tap[NumTaps:1];
 
-function automatic logic [FracBits-1:0] popcount(logic [NumTaps-1:0] taps);
+function automatic logic [PhaseWidth-1:0] popcount(logic [NumTaps-1:0] taps);
     popcount = '0;
     for (int i = 0; i < NumTaps; i++)
-        popcount += FracBits'(taps[i]);
+        popcount += PhaseWidth'(taps[i]);
 endfunction
 
-logic [FracBits-1:0] frac_comb;
-always_comb frac_comb = popcount(sampled);
-assign frac_o = frac_comb;
+logic [PhaseWidth-1:0] phase_comb;
+always_comb phase_comb = popcount(sampled);
+assign phase_o = phase_comb;
 
 `else
 
@@ -108,19 +103,19 @@ always @(posedge dco_clk_i) begin
         dco_period = dco_rise_time - dco_rise_prev;
 end
 
-logic [FracBits-1:0] frac_q;
+logic [PhaseWidth-1:0] phase_q;
 real frac_real;
 always @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
-        frac_q <= '0;
+        phase_q <= '0;
     end else begin
         frac_real = (dco_period > 0.0) ? ($realtime - dco_rise_time) / dco_period : 0.0;
         if (frac_real < 0.0)   frac_real = 0.0;
         if (frac_real > 0.999) frac_real = 0.999;
-        frac_q <= FracBits'($rtoi(frac_real * (1 << FracBits)));
+        phase_q <= PhaseWidth'($rtoi(frac_real * (1 << PhaseWidth)));
     end
 end
-assign frac_o = frac_q;
+assign phase_o = phase_q;
 
 `endif
 

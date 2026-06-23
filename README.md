@@ -33,7 +33,7 @@ headers and in [`docs/adpll_survey.md`](docs/adpll_survey.md).
   (1-bit sign), `linear` (multi-bit PI, power-of-two α/β), `gearshift` (adaptive-step binary
   search); plus `phase`, a true phase-locked type-II PI using the TDC.
 - **DCOs** (`rtl/dco/`) — `binary`, `thermometer`, `muxtap`, `coarsefine` ring oscillators.
-- **CSR** (`rtl/csr/`) — `adpll_csr`, a single-PLL AXI4-Lite control/status block (enable/mul/div
+- **CSR** (`rtl/csr/`) — `s_axi_adpll_csr`, a single-PLL AXI4-Lite control/status block (enable/mul/div
   + lock/tune) showing how to drive one PLL over a bus.
 
 Picking specific frozen controller×DCO configurations ("macros") and arraying many PLLs behind one
