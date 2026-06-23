@@ -28,20 +28,21 @@
 //
 // Ref: Staszewski & Balsara (Wiley, 2006), Ch. 6 (time-to-digital converter, flash delay line).
 // Time-to-digital converter for the phase-domain ADPLL. At each reference edge (clk_i) it reports
-// how far into the current DCO period the reference fell -- the sub-cycle (fractional) phase of
-// dco_clk_i, in [0,1) scaled to 2^PhaseWidth. The integer DCO phase is the edge count; this
-// fractional phase is what gives the loop sub-cycle resolution (Staszewski's normalized OTW).
+// the DCO phase within the current cycle as an unsigned fixed-point angle: the range [0, 2*pi) is
+// encoded across the full PhaseWidth-bit output, all-zeros = 0 and all-ones = just below 2*pi. The
+// integer DCO phase is the edge count; this sub-cycle angle is what gives the loop its resolution.
 // SYNTHESIS = a flash delay line of adpll_delay_cell taps sampled by reference-clocked flops,
 // then a thermometer popcount; else a behavioural model reading the elapsed time directly.
 // The only PDK-specific piece is adpll_delay_cell (the delay tap); the samplers are plain flops.
 //
 // Parameters:
-//   - PhaseWidth : fractional-phase resolution; the structural delay line is 2^PhaseWidth-1 taps
+//   - PhaseWidth : phase resolution in bits; codes 0..2^PhaseWidth-1 span one cycle [0, 2*pi).
+//                  The structural delay line is 2^PhaseWidth-1 taps.
 // Ports:
 //   - clk_i     : reference clock (the instant whose DCO phase is measured)
 //   - rst_ni    : async-low reset (behavioural register only)
-//   - dco_clk_i : DCO clock whose sub-cycle phase is measured
-//   - phase_o   : fractional DCO phase at the clk_i edge, in [0,1) * 2^PhaseWidth
+//   - dco_clk_i : DCO clock whose phase is measured
+//   - phase_o   : DCO phase at the clk_i edge, [0, 2*pi) encoded 00..00 (0) to 11..11 (~2*pi)
 
 module adpll_tdc #(
     parameter int unsigned PhaseWidth = 6
@@ -88,8 +89,9 @@ assign phase_o = phase_comb;
 `else
 
 // Behavioural model: read the elapsed time from the last DCO rising edge to this reference edge
-// and divide by the measured DCO period -> fraction in [0,1). Sim-only (uses $realtime, like the
-// ring-DCO behavioural models); the structural delay line above is the synthesizable form.
+// and divide by the measured DCO period -> a fraction of the cycle, scaled to the [0, 2*pi) phase
+// code. Sim-only (uses $realtime, like the ring-DCO behavioural models); the structural delay line
+// above is the synthesizable form.
 realtime dco_rise_time, dco_rise_prev, dco_period;
 initial begin
     dco_rise_time = 0.0;
@@ -112,7 +114,7 @@ always @(posedge clk_i or negedge rst_ni) begin
         frac_real = (dco_period > 0.0) ? ($realtime - dco_rise_time) / dco_period : 0.0;
         if (frac_real < 0.0)   frac_real = 0.0;
         if (frac_real > 0.999) frac_real = 0.999;
-        phase_q <= PhaseWidth'($rtoi(frac_real * (1 << PhaseWidth)));
+        phase_q <= PhaseWidth'($rtoi(frac_real * (1 << PhaseWidth)));   // [0,1) cycle -> [0,2*pi) code
     end
 end
 assign phase_o = phase_q;
