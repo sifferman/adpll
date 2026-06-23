@@ -85,15 +85,13 @@ module s_axi_adpll_csr #(
 
 localparam int unsigned AddrLsb = $clog2(STRB_WIDTH);   // byte-within-word address bits
 
-logic                       ctrl_q;          // CTRL[0] = enable
-logic [EdgeCountWidth-1:0]  mul_q;
-logic [WindowSizeWidth-1:0] div_q;
+// mul/div are each written from one DATA_WIDTH register, so their fields must fit in it.
+if (EdgeCountWidth  > DATA_WIDTH) $error("EdgeCountWidth exceeds DATA_WIDTH");
+if (WindowSizeWidth > DATA_WIDTH) $error("WindowSizeWidth exceeds DATA_WIDTH");
 
-logic _unused;
-assign _unused = &{1'b0, s_axil_awprot, s_axil_arprot,
-                   s_axil_awaddr[ADDR_WIDTH-1:AddrLsb+2], s_axil_awaddr[AddrLsb-1:0],
-                   s_axil_araddr[ADDR_WIDTH-1:AddrLsb+2], s_axil_araddr[AddrLsb-1:0],
-                   s_axil_wdata[DATA_WIDTH-1:EdgeCountWidth], s_axil_wdata[DATA_WIDTH-1:WindowSizeWidth]};
+logic                       ctrl_d, ctrl_q;   // CTRL[0] = enable
+logic [EdgeCountWidth-1:0]  mul_d, mul_q;
+logic [WindowSizeWidth-1:0] div_d, div_q;
 
 // ---- write channel ----
 logic       bvalid_d, bvalid_q;
@@ -106,9 +104,6 @@ always_comb begin
     else if (s_axil_bready) bvalid_d = 1'b0;
 end
 
-logic                       ctrl_d;
-logic [EdgeCountWidth-1:0]  mul_d;
-logic [WindowSizeWidth-1:0] div_d;
 always_comb begin
     ctrl_d = ctrl_q;
     mul_d  = mul_q;
