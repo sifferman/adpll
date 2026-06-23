@@ -33,14 +33,17 @@ headers and in [`docs/adpll_survey.md`](docs/adpll_survey.md).
   (1-bit sign), `linear` (multi-bit PI, power-of-two α/β), `gearshift` (adaptive-step binary
   search); plus `phase`, a true phase-locked type-II PI using the TDC.
 - **DCOs** (`rtl/dco/`) — `binary`, `thermometer`, `muxtap`, `coarsefine` ring oscillators.
-- **Array** (`rtl/array/`) — `adpll_array`: all 12 controller×DCO macros (`rtl/macros/`) behind
-  `adpll_array_csr` (AXI4-Lite, per-PLL enable/mul/div + lock/tune + a CSR-selected observation
-  mux); `adpll_csr` is the single-PLL CSR.
+- **CSR** (`rtl/csr/`) — `adpll_csr`, a single-PLL AXI4-Lite control/status block (enable/mul/div
+  + lock/tune) showing how to drive one PLL over a bus.
+
+Picking specific frozen controller×DCO configurations ("macros") and arraying many PLLs behind one
+bus is integration left to the instantiating project (e.g. gf180mcu-peripherals builds a 12-PLL
+array from these blocks) — this repo ships the reusable parameterizable parts.
 
 ## Layout
 
 ```
-rtl/      controllers, counter, lock detector, TDC, DCOs, macros, the array + CSRs
+rtl/      adpll_freq_counter, adpll_lock_detect, adpll_tdc, controller/, dco/, csr/
 sim/      self-contained Icarus testbenches (+ _sim_timescale.v)
 scripts/  gen_ring_dco_spice.py (SPICE characterization), characterize_pll.py, plot_pll.py
 docs/     adpll_survey.md (the variant survey, citations, results) + figures
@@ -54,7 +57,6 @@ make sim-adpll-survey   # compare the FLL controllers (bang-bang / linear / gear
 make sim-adpll-matrix   # all 12 FLL variants (3 controllers x 4 DCOs)
 make sim-adpll-phase    # phase-domain ADPLL (TDC): true phase lock
 make sim-adpll-csr      # single-PLL CSR over AXI4-Lite
-make sim-adpll-array    # program all 12 PLLs over the CSR, poll lock, test the obs mux
 ```
 
 DCO frequency-vs-code is physical — characterize it in SPICE per PDK:

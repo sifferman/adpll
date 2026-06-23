@@ -4,13 +4,9 @@
 TS    = sim/_sim_timescale.v
 # Shared core + all controllers + all DCOs (single-PLL testbench picks one of each via plusdefines)
 CORE  = $(wildcard rtl/*.sv rtl/controller/*.sv rtl/dco/*.sv)
-ARRAY = rtl/array/adpll_array_csr.sv rtl/array/adpll_array.sv $(wildcard rtl/macros/*.sv) \
-        rtl/controller/adpll_controller_bangbang.sv rtl/controller/adpll_controller_linear.sv \
-        rtl/controller/adpll_controller_gearshift.sv rtl/adpll_freq_counter.sv rtl/adpll_lock_detect.sv \
-        $(wildcard rtl/dco/*.sv)
 NGSPICE ?= ngspice
 
-.PHONY: help sim-adpll sim-adpll-survey sim-adpll-matrix sim-adpll-phase sim-adpll-csr sim-adpll-array dco-spice clean
+.PHONY: help sim-adpll sim-adpll-survey sim-adpll-matrix sim-adpll-phase sim-adpll-csr dco-spice clean
 help: ## List targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-20s %s\n",$$1,$$2}'
 
@@ -52,14 +48,9 @@ sim-adpll-phase: ## Phase-domain ADPLL (TDC + reference/variable phase accumulat
 sim-adpll-csr: ## Single-PLL CSR: program mul/div/enable over AXI4-Lite, poll STATUS for lock
 	@mkdir -p sim_build
 	iverilog -g2012 -o sim_build/tb_adpll_csr $(TS) \
-		rtl/array/adpll_csr.sv rtl/controller/adpll_controller_bangbang.sv rtl/adpll_freq_counter.sv \
+		rtl/csr/adpll_csr.sv rtl/controller/adpll_controller_bangbang.sv rtl/adpll_freq_counter.sv \
 		rtl/adpll_lock_detect.sv rtl/dco/ring_dco_binary.sv sim/tb_adpll_csr.v
 	vvp sim_build/tb_adpll_csr | grep -E "CSR programmed|LOCKED|PASS|FAIL"
-
-sim-adpll-array: ## CSR framework: program all 12 PLLs over AXI4-Lite, poll each for lock, test obs mux
-	@mkdir -p sim_build
-	iverilog -g2012 -o sim_build/tb_adpll_array $(TS) $(ARRAY) sim/tb_adpll_array.v
-	vvp sim_build/tb_adpll_array | grep -E "programmed|LOCKED|PASS|FAIL|obs mux"
 
 dco-spice: ## DCO freq-vs-code in ngspice. Requires: make dco-spice PDK_ROOT=... PDK=gf180mcuD NGSPICE=...
 	python3 scripts/gen_ring_dco_spice.py --pdk-root $(PDK_ROOT) --pdk $(PDK) --ngspice $(NGSPICE) \
