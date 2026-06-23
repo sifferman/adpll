@@ -54,9 +54,9 @@ module adpll_lock_detect #(
     output wire                   lock_o
 );
 
-logic [SampleWidth-1:0]           band_center_d, band_center_q;
+logic [SampleWidth-1:0]                 band_center_d, band_center_q;
 logic [$clog2(MinSamplesForLock+1)-1:0] in_band_d, in_band_q;
-logic                             lock_d, lock_q;
+logic                                   lock_d, lock_q;
 
 wire signed [SampleWidth+1:0] band_error     = $signed({2'b0, tuning_sample_i}) - $signed({2'b0, band_center_q});
 wire        [SampleWidth:0]   band_error_abs  = band_error[SampleWidth+1] ? -band_error : band_error;
