@@ -65,9 +65,9 @@ localparam int unsigned NumTaps = (1 << PhaseWidth) - 1;
 wire [NumTaps:0] tap;
 assign tap[0] = dco_clk_i;
 for (genvar i_GEN = 0; i_GEN < NumTaps; i_GEN++) begin : delay_line
-    adpll_cell_delay u_dly (
-        .a (tap[i_GEN]),
-        .z (tap[i_GEN + 1])
+    adpll_cell_delay #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_dly (
+        .A (tap[i_GEN]),
+        .Y (tap[i_GEN + 1])
     );
 end
 

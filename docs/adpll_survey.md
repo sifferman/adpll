@@ -124,7 +124,7 @@ time. Finding: the linear PI is faster and more accurate *once gains are matched
 on a coarse DCO it needs that care (small α / integral-dominant acquisition); the bang-bang
 needs none and is inherently PVT-robust — which is why bang-bang dominates coarse ADPLLs.
 
-### DCO across PVT corners — `make dco-spice-corners` (ngspice ≥ 42, `ring_dco_binary`, 7-bit)
+### DCO across PVT corners (ngspice ≥ 42, `ring_dco_binary`, 7-bit)
 
 Fine code sweep (raw data in `figures/corner_*.dat`):
 
@@ -159,13 +159,13 @@ Findings (confirming the textbook):
 3. **High codes go multi-mode** (code ≥ 32 reads *higher* than code 24, non-monotonic): a long
    ring sustains multiple circulating waves. Usable monotonic range is codes 0–24.
 
-Corner sims are run regularly via `make dco-spice-corners` as the design evolves; the figures
-are regenerated with `scripts/plot_pll.py`.
+These corner numbers were measured in ngspice; the figures are plotted with `scripts/plot_pll.py`.
+The SPICE flow is being moved to OpenROAD/Magic parasitic extraction from the hardened `ring_dco`
+macro (single source of truth = the `.sv`), replacing the former hand-written netlist generator.
 
-### Coarse/fine DCO in SPICE — `gen_ring_dco_spice.py --topology coarsefine`
+### Coarse/fine DCO in SPICE
 
-The two-bank DCO is SPICE-characterizable like the rest. Typical-corner sweep (7-bit,
-`--fine-bits 3`):
+The two-bank DCO is SPICE-characterizable like the rest. Typical-corner sweep (7-bit, 3 fine bits):
 
 | code | freq (TT) |
 |---|---|

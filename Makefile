@@ -1,15 +1,19 @@
 # adpll — standalone all-digital ring-oscillator PLL IP. Self-contained Icarus sims (no PDK).
-# DCO SPICE characterization needs a PDK: pass PDK_ROOT/PDK/NGSPICE (see dco-spice).
+# DCO SPICE characterization (freq-vs-code) is being moved to OpenROAD/Magic parasitic extraction
+# from the hardened ring_dco macros, replacing the former hand-written netlist generator.
 
 SHELL := /bin/bash
 # iverilog defaults to 1 s precision and rounds the behavioural #(1.0ns) delays to zero; set a
 # 1ns/1ps default timescale via an iverilog command file (process substitution -- no source stub).
 TS    = -c <(printf '+timescale+1ns/1ps\n')
 # Shared core + all loop filters + all DCOs (single-PLL testbench picks one of each via plusdefines)
-CORE  = $(wildcard rtl/*.sv rtl/cells/*.sv rtl/loop_filter/*.sv rtl/dco/*.sv)
-NGSPICE ?= ngspice
+# NOTE: rtl/cells/ is intentionally excluded -- the cells select a target library via a `string`
+# parameter, which iverilog mis-handles (core-dumps on an unequal-length string compare). The IP
+# sims use the DCOs' behavioural clock model (the cells are a synthesis/slang concern), so they are
+# not needed here. The cells are elaborated by yosys+slang in the chip flow.
+CORE  = $(wildcard rtl/*.sv rtl/loop_filter/*.sv rtl/dco/*.sv)
 
-.PHONY: help sim-adpll sim-adpll-survey sim-adpll-matrix sim-adpll-phase sim-adpll-csr dco-spice clean
+.PHONY: help sim-adpll sim-adpll-survey sim-adpll-matrix sim-adpll-phase sim-adpll-csr clean
 help: ## List targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-20s %s\n",$$1,$$2}'
 
@@ -54,10 +58,6 @@ sim-adpll-csr: ## Single-PLL CSR: program mul/div/enable over AXI4-Lite, poll ST
 		rtl/axi/s_axi_adpll_csr.sv rtl/adpll_freq_detector.sv rtl/adpll_freq_counter.sv rtl/adpll_lock_detector.sv \
 		rtl/loop_filter/adpll_loop_filter_bangbang.sv rtl/dco/ring_dco_binary.sv sim/tb_adpll_csr.v
 	vvp sim_build/tb_adpll_csr | grep -E "CSR programmed|LOCKED|PASS|FAIL"
-
-dco-spice: ## DCO freq-vs-code in ngspice. Requires: make dco-spice PDK_ROOT=... PDK=gf180mcuD NGSPICE=...
-	python3 scripts/gen_ring_dco_spice.py --pdk-root $(PDK_ROOT) --pdk $(PDK) --ngspice $(NGSPICE) \
-		--bits 7 --topology $(or $(TOPOLOGY),binary) --sweep 0,4,8,16,32,64,96,127 --run --workdir sim_build
 
 clean: ## Remove sim build artifacts
 	rm -rf sim_build

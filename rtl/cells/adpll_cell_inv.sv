@@ -26,32 +26,42 @@
 
 // adpll_cell_inv
 //
-// Inverter (z = ~a), one of the PDK-specific primitives the ring DCOs are built from (it forms the
-// delay-segment inverter pairs). One of the cells in `rtl/cells/`; retarget a PDK by reimplementing
-// this dir. PORT IT by swapping the instantiation below for your PDK's inverter; keep the
-// (* keep *)/(* dont_touch *) so the optimiser does not dissolve the ring's combinational loop.
+// Inverter (Y = ~A). One of the PDK-specific primitives the ring DCOs are built from (the
+// delay-segment inverter pairs). Ports mirror the gf180 cell (A, Y) so the wrapper is drop-in.
+// The implementation is chosen by the `Target` string parameter, NOT by a `define -- so a single
+// elaboration can mix targets and a sim needs no special macros:
+//   - "gf180mcu_as_sc_mcu7t3v3" : the gf180 3.3 V standard cell, (* keep *)/(* dont_touch *) so the
+//                                 optimiser does not dissolve the ring's combinational loop.
+//   - "behavioral"              : an RTL model with a unit gate delay (so a structural ring built
+//                                 from these cells actually oscillates in simulation).
+// An unknown Target is a hard error ($fatal). PORT a new PDK by adding a branch here; nothing
+// outside rtl/cells/ changes.
 //
+// Parameters:
+//   - Target          : target library ("gf180mcu_as_sc_mcu7t3v3" | "behavioral")
+//   - BehavioralDelay : behavioral gate delay (ignored for a real PDK cell, whose delay is the silicon's)
 // Ports:
-//   - a : input
-//   - z : inverted output (z = ~a)
+//   - A : input
+//   - Y : inverted output (Y = ~A)
 
-module adpll_cell_inv (
-    input  wire a,
-    output wire z
+module adpll_cell_inv #(
+    parameter string   Target          = "behavioral",
+    parameter realtime BehavioralDelay = 0.1ns
+) (
+    input  wire A,
+    output wire Y
 );
 
-`ifdef SYNTHESIS
-// --- gf180mcu 3.3 V (replace this instantiation for another PDK) ---
-(* keep *) (* dont_touch = "true" *)
-gf180mcu_as_sc_mcu7t3v3__inv_2 u_cell (
-    .A (a),
-    .Y (z)
-);
-`else
-// Functional model. The ring DCOs use their own behavioural clock model in sim, so this is not in
-// an oscillating loop today; it is zero-delay. (A `#`-delay here would let the structural ring
-// itself oscillate in sim -- a future option that would re-set the frequency-vs-tune curve.)
-assign z = ~a;
-`endif
+if (Target == "gf180mcu_as_sc_mcu7t3v3") begin : g_gf180mcu_as_sc_mcu7t3v3
+    (* keep *) (* dont_touch = "true" *)
+    gf180mcu_as_sc_mcu7t3v3__inv_2 u_cell (
+        .A (A),
+        .Y (Y)
+    );
+end else if (Target == "behavioral") begin : g_behavioral
+    assign #(BehavioralDelay) Y = ~A;
+end else begin : g_invalid
+    initial $fatal(1, "adpll_cell_inv: unsupported Target \"%s\"", Target);
+end
 
 endmodule

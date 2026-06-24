@@ -26,33 +26,44 @@
 
 // adpll_cell_nand
 //
-// 2-input NAND (y = ~(a & b)). In the ring DCOs this is the gating gate: it injects enable_i and
-// supplies the single inversion that sustains oscillation (b = ring feedback). One of the
-// PDK-specific primitives in `rtl/cells/`; retarget a PDK by reimplementing this dir. PORT IT by
-// swapping the instantiation below; keep the (* keep *)/(* dont_touch *) so the optimiser does not
-// dissolve the ring's combinational loop.
+// 2-input NAND (Y = ~(A & B)). In the ring DCOs this is the gating gate: it injects enable and
+// supplies the single inversion that sustains oscillation (B = ring feedback). Ports mirror the
+// gf180 cell (A, B, Y) so the wrapper is drop-in. The implementation is chosen by the `Target`
+// string parameter, NOT by a `define:
+//   - "gf180mcu_as_sc_mcu7t3v3" : the gf180 3.3 V standard cell, (* keep *)/(* dont_touch *) so the
+//                                 optimiser does not dissolve the ring's combinational loop.
+//   - "behavioral"              : an RTL model with a unit gate delay (so a structural ring
+//                                 oscillates in sim).
+// An unknown Target is a hard error ($fatal). PORT a new PDK by adding a branch here; nothing
+// outside rtl/cells/ changes.
 //
+// Parameters:
+//   - Target          : target library ("gf180mcu_as_sc_mcu7t3v3" | "behavioral")
+//   - BehavioralDelay : behavioral gate delay (ignored for a real PDK cell)
 // Ports:
-//   - a, b : inputs
-//   - y    : output (y = ~(a & b))
+//   - A, B : inputs
+//   - Y    : output (Y = ~(A & B))
 
-module adpll_cell_nand (
-    input  wire a,
-    input  wire b,
-    output wire y
+module adpll_cell_nand #(
+    parameter string   Target          = "behavioral",
+    parameter realtime BehavioralDelay = 0.1ns
+) (
+    input  wire A,
+    input  wire B,
+    output wire Y
 );
 
-`ifdef SYNTHESIS
-// --- gf180mcu 3.3 V (replace this instantiation for another PDK) ---
-(* keep *) (* dont_touch = "true" *)
-gf180mcu_as_sc_mcu7t3v3__nand2_2 u_cell (
-    .A (a),
-    .B (b),
-    .Y (y)
-);
-`else
-// Functional model (see adpll_cell_inv on the zero-delay note).
-assign y = ~(a & b);
-`endif
+if (Target == "gf180mcu_as_sc_mcu7t3v3") begin : g_gf180mcu_as_sc_mcu7t3v3
+    (* keep *) (* dont_touch = "true" *)
+    gf180mcu_as_sc_mcu7t3v3__nand2_2 u_cell (
+        .A (A),
+        .B (B),
+        .Y (Y)
+    );
+end else if (Target == "behavioral") begin : g_behavioral
+    assign #(BehavioralDelay) Y = ~(A & B);
+end else begin : g_invalid
+    initial $fatal(1, "adpll_cell_nand: unsupported Target \"%s\"", Target);
+end
 
 endmodule

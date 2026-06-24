@@ -67,10 +67,10 @@ wire [NumFineBits-1:0]   fine_code   = tune_i[NumFineBits-1:0];
 wire feedback;
 wire [NumCoarseUnits:0] coarse_node;
 
-adpll_cell_nand u_gate (
-    .a (enable_i),
-    .b (feedback),
-    .y (coarse_node[0])
+adpll_cell_nand #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_gate (
+    .A (enable_i),
+    .B (feedback),
+    .Y (coarse_node[0])
 );
 
 // Coarse bank: unit k inserts CoarsePairs inverter-pairs of delay when k < coarse_code.
@@ -78,20 +78,20 @@ for (genvar k_GEN = 0; k_GEN < NumCoarseUnits; k_GEN++) begin : coarse_unit
     wire [2*CoarsePairs:0] d;
     assign d[0] = coarse_node[k_GEN];
     for (genvar j_GEN = 0; j_GEN < CoarsePairs; j_GEN++) begin : inverter_pair
-        adpll_cell_inv u_inv_a (
-            .a (d[2*j_GEN]),
-            .z (d[2*j_GEN + 1])
+        adpll_cell_inv #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_inv_a (
+            .A (d[2*j_GEN]),
+            .Y (d[2*j_GEN + 1])
         );
-        adpll_cell_inv u_inv_b (
-            .a (d[2*j_GEN + 1]),
-            .z (d[2*j_GEN + 2])
+        adpll_cell_inv #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_inv_b (
+            .A (d[2*j_GEN + 1]),
+            .Y (d[2*j_GEN + 2])
         );
     end
-    adpll_cell_mux u_sel (
-        .a (coarse_node[k_GEN]),
-        .b (d[2*CoarsePairs]),
-        .s (k_GEN < coarse_code),
-        .y (coarse_node[k_GEN + 1])
+    adpll_cell_mux #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_sel (
+        .A (coarse_node[k_GEN]),
+        .B (d[2*CoarsePairs]),
+        .S (k_GEN < coarse_code),
+        .Y (coarse_node[k_GEN + 1])
     );
 end
 
@@ -100,19 +100,19 @@ wire [NumFineUnits:0] fine_node;
 assign fine_node[0] = coarse_node[NumCoarseUnits];
 for (genvar k_GEN = 0; k_GEN < NumFineUnits; k_GEN++) begin : fine_unit
     wire mid, delayed;
-    adpll_cell_inv u_inv_a (
-        .a (fine_node[k_GEN]),
-        .z (mid)
+    adpll_cell_inv #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_inv_a (
+        .A (fine_node[k_GEN]),
+        .Y (mid)
     );
-    adpll_cell_inv u_inv_b (
-        .a (mid),
-        .z (delayed)
+    adpll_cell_inv #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_inv_b (
+        .A (mid),
+        .Y (delayed)
     );
-    adpll_cell_mux u_sel (
-        .a (fine_node[k_GEN]),
-        .b (delayed),
-        .s (k_GEN < fine_code),
-        .y (fine_node[k_GEN + 1])
+    adpll_cell_mux #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_sel (
+        .A (fine_node[k_GEN]),
+        .B (delayed),
+        .S (k_GEN < fine_code),
+        .Y (fine_node[k_GEN + 1])
     );
 end
 

@@ -26,36 +26,48 @@
 
 // adpll_cell_mux
 //
-// 2:1 multiplexer (y = s ? b : a). In the ring DCOs it selects whether a delay segment is inserted
-// (s = 1, y = b = delayed path) or bypassed (s = 0, y = a). One of the PDK-specific primitives in
-// `rtl/cells/`; retarget a PDK by reimplementing this dir. PORT IT by swapping the instantiation
-// below; keep the (* keep *)/(* dont_touch *) so the optimiser does not dissolve the ring path.
+// 2:1 multiplexer (Y = S ? B : A). In the ring DCOs it selects whether a delay segment is inserted
+// (S = 1, Y = B = delayed path) or bypassed (S = 0, Y = A). Ports mirror the gf180 cell (A, B, S, Y)
+// so the wrapper is drop-in. The implementation is chosen by the `Target` string parameter, NOT by
+// a `define:
+//   - "gf180mcu_as_sc_mcu7t3v3" : the gf180 3.3 V standard cell, (* keep *)/(* dont_touch *) so the
+//                                 optimiser does not dissolve the ring path.
+//   - "behavioral"              : an RTL model with a unit gate delay (so a structural ring
+//                                 oscillates in sim).
+// An unknown Target is a hard error ($fatal). PORT a new PDK by adding a branch here; nothing
+// outside rtl/cells/ changes.
 //
+// Parameters:
+//   - Target          : target library ("gf180mcu_as_sc_mcu7t3v3" | "behavioral")
+//   - BehavioralDelay : behavioral gate delay (ignored for a real PDK cell)
 // Ports:
-//   - a : input selected when s = 0
-//   - b : input selected when s = 1
-//   - s : select
-//   - y : output (y = s ? b : a)
+//   - A : input selected when S = 0
+//   - B : input selected when S = 1
+//   - S : select
+//   - Y : output (Y = S ? B : A)
 
-module adpll_cell_mux (
-    input  wire a,
-    input  wire b,
-    input  wire s,
-    output wire y
+module adpll_cell_mux #(
+    parameter string   Target          = "behavioral",
+    parameter realtime BehavioralDelay = 0.1ns
+) (
+    input  wire A,
+    input  wire B,
+    input  wire S,
+    output wire Y
 );
 
-`ifdef SYNTHESIS
-// --- gf180mcu 3.3 V (replace this instantiation for another PDK) ---
-(* keep *) (* dont_touch = "true" *)
-gf180mcu_as_sc_mcu7t3v3__mux2_2 u_cell (
-    .A (a),
-    .B (b),
-    .S (s),
-    .Y (y)
-);
-`else
-// Functional model (see adpll_cell_inv on the zero-delay note).
-assign y = s ? b : a;
-`endif
+if (Target == "gf180mcu_as_sc_mcu7t3v3") begin : g_gf180mcu_as_sc_mcu7t3v3
+    (* keep *) (* dont_touch = "true" *)
+    gf180mcu_as_sc_mcu7t3v3__mux2_2 u_cell (
+        .A (A),
+        .B (B),
+        .S (S),
+        .Y (Y)
+    );
+end else if (Target == "behavioral") begin : g_behavioral
+    assign #(BehavioralDelay) Y = S ? B : A;
+end else begin : g_invalid
+    initial $fatal(1, "adpll_cell_mux: unsupported Target \"%s\"", Target);
+end
 
 endmodule

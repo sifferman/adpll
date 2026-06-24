@@ -60,7 +60,7 @@ rtl/loop_filter  bangbang / pi / gearshift loop filters
 rtl/dco          binary / thermometer / muxtap / coarsefine ring DCOs
 rtl/axi          s_axi_adpll_csr (AXI4-Lite control/status)
 sim/             self-contained Icarus testbenches
-scripts/         gen_ring_dco_spice.py (SPICE characterization), characterize_pll.py, plot_pll.py
+scripts/         characterize_pll.py, plot_pll.py (loop/DCO analysis + figures)
 docs/            adpll_survey.md (the variant survey, citations, results) + figures
 ```
 
@@ -74,23 +74,24 @@ make sim-adpll-phase    # phase-domain ADPLL (TDC): true phase lock
 make sim-adpll-csr      # single-PLL CSR over AXI4-Lite
 ```
 
-DCO frequency-vs-code is physical — characterize it in SPICE per PDK:
-
-```sh
-make dco-spice PDK_ROOT=/path/to/pdks PDK=gf180mcuD NGSPICE=/path/to/ngspice TOPOLOGY=binary
-```
+DCO frequency-vs-code is physical, so it is characterized in **SPICE**, not RTL. That flow is
+moving to OpenROAD/Magic parasitic extraction from the hardened `ring_dco` macro (single source of
+truth = the `.sv`); the former hand-written netlist generator has been removed.
 
 ## Portability
 
 Every PDK-specific primitive is isolated in **`rtl/cells/`** — the single retarget seam. The ring
 DCOs and the TDC delay line instantiate only these wrappers (`adpll_cell_inv`/`_nand`/`_mux` in the
-rings; `adpll_cell_delay` in the TDC), never a PDK cell directly. Each wrapper is `` `ifdef SYNTHESIS ``
-→ the gf180 3.3 V cell (`inv_2`/`nand2_2`/`mux2_2`/`dlybuff_2`, with `keep`/`dont_touch`), `` `else ``
-→ a behavioural model. **To retarget a PDK (sky130, ASAP7, …), reimplement just `rtl/cells/`** — the
-rings, TDC, detectors, and loop filters are untouched. Keep the ring's combinational loop out of
-optimization (`keep`/`dont_touch`) and out of the clock-tree/STA (leave the DCO clock undefined in
-SDC). The absolute frequency is set by the silicon, not RTL — the closed loop tunes to whatever ratio
-is reachable, so there is no "delay" parameter to set.
+rings; `adpll_cell_delay` in the TDC, ports mirroring the gf180 cells), never a PDK cell directly.
+Each wrapper picks its implementation from a `Target` **string parameter** (not a `` `define ``): the
+DCOs pass `Target="gf180mcu_as_sc_mcu7t3v3"` (the gf180 3.3 V cell, `inv_2`/`nand2_2`/`mux2_2`/
+`dlybuff_2`, with `keep`/`dont_touch`), and the default `"behavioral"` is an RTL `#`-delay model; an
+unknown target is a `$fatal`. **To retarget a PDK (sky130, ASAP7, …), add a branch in `rtl/cells/`
+and pass its name as `Target`** — the rings, TDC, detectors, and loop filters are untouched. The DCO
+loop-lock simulations use the DCOs' own behavioural clock model (the `Target` cells are a synthesis
+concern); the ring's real frequency-vs-code curve is physical and is characterised in **SPICE**, not
+RTL. Keep the ring's combinational loop out of optimization (`keep`/`dont_touch`) and out of the
+clock-tree/STA (leave the DCO clock undefined in SDC).
 
 ## License
 
