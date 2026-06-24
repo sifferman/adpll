@@ -29,49 +29,49 @@
 // Ref: Kratyuk TCAS-II 2007 (linear power-of-two alpha/beta PI); Kajiwara-Nakagawa style (variable ring length via tap mux tree). See the loop-filter / DCO source files for detail.
 // One ADPLL configuration = linear loop filter + muxtap DCO, assembled
 // from the generic adpll blocks (detector -> loop filter -> DCO, plus lock detect; no "controller"
-// wrapper). Parameterizable -- NumTuneBits / MaxEdgesPerWindow / MaxWindowSize / the lock criterion size the
-// tune code, edge counter, window and lock band (defaults are the full-rate 7/24/16 config; shrink
+// wrapper). Parameterizable -- DcoNumTuneBits / FreqDetectorMaxEdgesPerWindow / FreqDetectorMaxWindowSize / the
+// lock criterion (LockMinSamplesForLock / LockBandRadius) size the tune code, edge counter, window and lock band (defaults are the full-rate 7/24/16 config; shrink
 // them for a fast closed-loop SPICE run). Each loop-filter x DCO combination is its own module name
 // (an RTL config elaborated inline, not a hardened macro).
 //
 // Ports:
 //   - clk_i, rst_ni, enable_i : run + program
 //   - mul_i, div_i   : synthesizer ratio N / M (set over the CSR)
-//   - lock_o, tune_o : status
+//   - lock_o           : status (lock flag)
+//   - debug_dco_tune_o : internal DCO tune code, debug observation only
 //   - dco_clk_o      : raw DCO clock, brought out for observation
 
 module adpll_linear_muxtap #(
-    parameter  int unsigned NumTuneBits       = 7,
-    parameter  int unsigned MaxEdgesPerWindow = (1 << 24) - 1,  // sets mul_i width (EdgeCountWidth)
-    parameter  int unsigned MaxWindowSize     = (1 << 16) - 1,  // sets div_i width (WindowSizeWidth)
-    parameter  int unsigned MinSamplesForLock = 8,
-    parameter  int unsigned BandRadius        = 2,
-    localparam int unsigned EdgeCountWidth    = $clog2(MaxEdgesPerWindow + 1),
-    localparam int unsigned WindowSizeWidth   = $clog2(MaxWindowSize + 1),
-    localparam int unsigned ErrorWidth        = EdgeCountWidth + 2   // = adpll_freq_detector.ErrorWidth
+    parameter  int unsigned DcoNumTuneBits                = 7,
+    parameter  int unsigned FreqDetectorMaxEdgesPerWindow = (1 << 24) - 1,
+    parameter  int unsigned FreqDetectorMaxWindowSize     = (1 << 16) - 1,
+    parameter  int unsigned LockMinSamplesForLock         = 8,
+    parameter  int unsigned LockBandRadius                = 2,
+    localparam int unsigned FreqDetectorWindowSizeWidth   = $clog2(FreqDetectorMaxWindowSize + 1),
+    localparam int unsigned LoopFilterErrorWidth          = $clog2(FreqDetectorMaxEdgesPerWindow + 1) + 2
 ) (
-    input  wire                        clk_i,
-    input  wire                        rst_ni,
-    input  wire                        enable_i,
-    input  wire [EdgeCountWidth-1:0]   mul_i,   // multiply ratio N (target edge count, set over CSR)
-    input  wire [WindowSizeWidth-1:0]  div_i,   // window length M (reference cycles, set over CSR)
+    input  wire                                               clk_i,
+    input  wire                                               rst_ni,
+    input  wire                                               enable_i,
+    input  wire [$clog2(FreqDetectorMaxEdgesPerWindow+1)-1:0] mul_i,  // target edge count N (set over CSR)
+    input  wire [FreqDetectorWindowSizeWidth-1:0]             div_i,  // window length M, ref cycles (CSR)
 
-    output wire                        lock_o,
-    output wire [NumTuneBits-1:0]      tune_o,
-    output wire                        dco_clk_o    // raw DCO oscillation, for observation
+    output wire                                               lock_o,
+    output wire [DcoNumTuneBits-1:0]                          debug_dco_tune_o,  // internal tune, debug only
+    output wire                                               dco_clk_o          // raw DCO oscillation
 );
 
 
-wire signed [ErrorWidth-1:0] error;
-wire                         valid;
-wire [NumTuneBits-1:0]       tune;
-wire [NumTuneBits-1:0]       lock_sample;
-wire                         dco_clk;
+wire signed [LoopFilterErrorWidth-1:0] error;
+wire                                   valid;
+wire [DcoNumTuneBits-1:0]              tune;
+wire [DcoNumTuneBits-1:0]              lock_sample;
+wire                                   dco_clk;
 
 // detector: DCO edges over a div_i window vs mul_i -> signed frequency error
 adpll_freq_detector #(
-    .MaxEdgesPerWindow(MaxEdgesPerWindow),
-    .MaxWindowSize    (MaxWindowSize)
+    .MaxEdgesPerWindow(FreqDetectorMaxEdgesPerWindow),
+    .MaxWindowSize    (FreqDetectorMaxWindowSize)
 ) adpll_freq_detector (
     .clk_i          (clk_i),
     .rst_ni         (rst_ni),
@@ -85,8 +85,8 @@ adpll_freq_detector #(
 
 // loop filter: maps the frequency error to the DCO tune code
 adpll_loop_filter_pi #(
-    .NumTuneBits(NumTuneBits),
-    .ErrorWidth (ErrorWidth)
+    .NumTuneBits(DcoNumTuneBits),
+    .ErrorWidth (LoopFilterErrorWidth)
 ) adpll_loop_filter_pi (
     .clk_i        (clk_i),
     .rst_ni       (rst_ni),
@@ -99,9 +99,9 @@ adpll_loop_filter_pi #(
 
 // lock detect: watches the settled tune sample
 adpll_lock_detector #(
-    .SampleWidth      (NumTuneBits),
-    .MinSamplesForLock(MinSamplesForLock),
-    .BandRadius       (BandRadius)
+    .SampleWidth      (DcoNumTuneBits),
+    .MinSamplesForLock(LockMinSamplesForLock),
+    .BandRadius       (LockBandRadius)
 ) adpll_lock_detector (
     .clk_i          (clk_i),
     .rst_ni         (rst_ni),
@@ -112,7 +112,7 @@ adpll_lock_detector #(
 );
 
 ring_dco_muxtap #(
-    .NumTuneBits(NumTuneBits),
+    .NumTuneBits(DcoNumTuneBits),
     .Target("gf180mcu_as_sc_mcu7t3v3")
 ) ring_dco_muxtap (
     .enable_i(enable_i),
@@ -120,7 +120,7 @@ ring_dco_muxtap #(
     .clk_o   (dco_clk)
 );
 
-assign tune_o    = tune;
-assign dco_clk_o = dco_clk;
+assign debug_dco_tune_o = tune;
+assign dco_clk_o        = dco_clk;
 
 endmodule
