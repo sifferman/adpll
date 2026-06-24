@@ -5,3 +5,5 @@ __pycache__/
 *.pyc
 # LibreLane harden/extraction run artifacts (DCO SPICE characterization)
 librelane/runs/
+# DCO SPICE sweep result (CI artifact)
+dco_freq.txt

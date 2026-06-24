@@ -62,8 +62,9 @@ jobs:
               --pdk-root "$PWD/.pdk" --pdk-family gf180mcuD --include-libraries all
             make dco-spice \
               PDK_ROOT="$PWD/.pdk" PDK=gf180mcuD SCL=gf180mcu_as_sc_mcu7t3v3 NGSPICE=ngspice \
-              DCO="$DCO" SWEEP="$SWEEP" | tee dco_freq.txt
+              DCO="$DCO" SWEEP="$SWEEP"
           '
+          # the verbose harden log is in this step above; dco_freq.txt holds just the freq table
 
       - name: Report freq-vs-code
         if: always()

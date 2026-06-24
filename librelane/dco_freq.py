@@ -85,22 +85,27 @@ def main():
     ap.add_argument("--settle", type=int, default=8)
     ap.add_argument("--periods", type=int, default=10)
     ap.add_argument("--workdir", default="/tmp")
+    ap.add_argument("--out", default=None, help="also write the freq-vs-code table to this file")
     a = ap.parse_args()
 
     ports = subckt_ports(a.extracted, a.design)
     if not ports:
         sys.exit(f"could not find .subckt {a.design} in {a.extracted}")
     codes = [int(c) for c in a.sweep.split(",")]
-    print(f"# {a.design}  corner={a.corner} vdd={a.vdd} temp={a.temp}  (ports: {' '.join(ports)})")
-    print(f"# {'code':>5}  {'freq_MHz':>10}  {'period_ns':>10}")
+
+    rows = [f"# {a.design}  corner={a.corner} vdd={a.vdd} temp={a.temp}  (ports: {' '.join(ports)})",
+            f"# {'code':>5}  {'freq_MHz':>10}  {'period_ns':>10}"]
     for c in codes:
         text = deck(a.extracted, a.pdk_ngspice, a.design, ports, c, a.bits,
                     a.corner, a.vdd, a.temp, a.tstop_ns, a.tstep_ps, a.settle, a.periods)
         f, per, out = run_one(text, a.workdir, f"{a.design}_{a.corner}_{c}", a.ngspice, a.periods)
-        if f is None:
-            print(f"  {c:>5}  {'NO-OSC':>10}")
-        else:
-            print(f"  {c:>5}  {f/1e6:>10.1f}  {per*1e9:>10.4f}")
+        rows.append(f"  {c:>5}  {'NO-OSC':>10}" if f is None
+                    else f"  {c:>5}  {f/1e6:>10.1f}  {per*1e9:>10.4f}")
+
+    table = "\n".join(rows) + "\n"
+    sys.stdout.write(table)                              # full log stream (CI step)
+    if a.out:                                            # just the table (small, for the summary)
+        open(a.out, "w").write(table)
 
 
 if __name__ == "__main__":

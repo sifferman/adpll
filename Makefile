@@ -76,7 +76,8 @@ dco-spice: ## Harden a ring_dco macro + ngspice tune sweep (freq-vs-code). Needs
 	librelane librelane/ring_dco.yaml --pdk $(PDK) --pdk-root $(PDK_ROOT) --scl $(SCL) -c DESIGN_NAME=$(DCO)
 	python3 librelane/dco_freq.py \
 		--extracted $$(ls -td librelane/runs/*/final/spice/$(DCO).spice | head -1) \
-		--pdk-ngspice $(PDK_NGSPICE) --ngspice $(NGSPICE) --design $(DCO) --bits 7 --sweep $(SWEEP)
+		--pdk-ngspice $(PDK_NGSPICE) --ngspice $(NGSPICE) --design $(DCO) --bits 7 --sweep $(SWEEP) \
+		--out dco_freq.txt
 
 clean: ## Remove sim build artifacts
 	rm -rf sim_build
