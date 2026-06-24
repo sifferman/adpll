@@ -102,9 +102,9 @@ adpll-spice: ## Harden a (shrunk) full adpll + closed-loop ngspice until lock (t
 	done
 
 .PHONY: cosim
-cosim: ## Mixed-signal cosim: ngspice ring DCO + Verilog loop (d_cosim) -> lock. ADPLL=<config> CORNER=<corner>
-	@test -n "$(PDK_NGSPICE)" || { echo "ERROR: PDK_NGSPICE empty -- no '*/$(PDK)/libs.tech/ngspice' under PDK_ROOT=$(PDK_ROOT). Is the PDK enabled?"; exit 1; }
-	cd cosim && PDK=$(PDK) PDK_ROOT=$(PDK_ROOT) SCL=$(SCL) ./run_cosim.sh $(ADPLL) $(CORNER)
+cosim: ## Gate-level mixed-signal cosim: ngspice ring DCO + synthesized gf180 loop (Icarus/d_cosim) -> lock. ADPLL= CORNER=
+	$(MAKE) -C cosim cosim ADPLL=$(ADPLL) CORNER=$(CORNER) REF_MHZ=$(REF_MHZ) \
+		PDK=$(PDK) SCL=$(SCL) PDK_ROOT=$(PDK_ROOT)
 
 clean: ## Remove sim build artifacts
 	rm -rf sim_build

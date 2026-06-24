@@ -1,12 +1,14 @@
-# Full-ADPLL closed-loop lock via mixed-signal CO-SIMULATION: the extracted ring DCO runs in ngspice
-# (real transistors) and the digital loop runs in Verilog through ngspice's d_cosim, coupled into a
-# true closed loop. Matrix = all 12 adpll_<filter>_<dco> configs x all process corners. Per cell:
-# harden the ring (corner-independent), build the loop .so for the filter, run ngspice at the corner.
+# Full-ADPLL closed-loop lock via gate-level mixed-signal CO-SIMULATION: the extracted ring DCO runs in
+# ngspice (real transistors) and the synthesized gf180 GATE loop runs in Icarus Verilog through
+# ngspice's d_cosim (ivlng shim), coupled into a true closed loop. Matrix = all 12 adpll_<filter>_<dco>
+# configs x all process corners. Per cell: harden the ring (corner-independent), derive the gate loop
+# from the wrapper with yosys, compile it with the PDK cell models, run ngspice at the corner.
 #
-# EXPERIMENTAL (hence workflow_dispatch + fail-fast:false): a cell locks only if the baked mul/div
-# (12/8 -> 300 MHz @ 200 MHz ref) is reachable by that DCO at that corner. Coarse / multi-mode rings
-# need per-config mul/div tuning for a clean lock -- red cells flag those, they are not flow bugs.
-# Heavy: each cell is a transistor-level ring transient (~minutes). See cosim/README.md.
+# EXPERIMENTAL (hence workflow_dispatch + fail-fast:false): a cell locks only if the mul/div (12/8 ->
+# 300 MHz @ 200 MHz ref) is reachable by that DCO at that corner. Coarse / multi-mode rings need
+# per-config mul/div tuning for a clean lock -- red cells flag those, they are not flow bugs.
+# Heavy: each cell is a transistor-level ring transient (~minutes) + an iverilog --enable-libvvp build
+# (ivlng requires libvvp). See cosim/README.md.
 
 name: ADPLL cosim (experimental)
 
@@ -45,6 +47,17 @@ jobs:
 
       - uses: actions/checkout@v4
 
+      - name: Build iverilog (--enable-libvvp, required by ivlng)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf gperf flex bison g++ make libbz2-dev zlib1g-dev
+          git clone --depth 1 https://github.com/steveicarus/iverilog.git /tmp/iverilog-src
+          cd /tmp/iverilog-src
+          sh autoconf.sh
+          ./configure --prefix="$HOME/iverilog-libvvp" --enable-libvvp
+          make -j"$(nproc)"
+          make install
+
       - name: Setup Nix
         uses: DeterminateSystems/nix-installer-action@main
         with:
@@ -62,14 +75,14 @@ jobs:
             ciel enable 019cf7a3e0de79bb0e4b6213758882d283c65816 \
               --pdk-root "$PWD/.pdk" --pdk-family gf180mcuD --include-libraries all
             make cosim PDK_ROOT="$PWD/.pdk" PDK=gf180mcuD SCL=gf180mcu_as_sc_mcu7t3v3 \
-              ADPLL="$ADPLL" CORNER="$CORNER"
+              IVL_PREFIX="$HOME/iverilog-libvvp" ADPLL="$ADPLL" CORNER="$CORNER"
           '
 
       - name: Report
         if: always()
         run: |
           { echo "### ${{ matrix.adpll }} @ ${{ matrix.corner }}"; echo '```'; \
-            cat cosim/cosim_${{ matrix.adpll }}_${{ matrix.corner }}.txt 2>/dev/null || echo "(no result)"; \
+            grep -aiE "LOCKED|NO-LOCK|t_lock" cosim/build/${{ matrix.adpll }}_${{ matrix.corner }}.log 2>/dev/null || echo "(no result)"; \
             echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload
@@ -77,5 +90,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cosim-${{ matrix.adpll }}-${{ matrix.corner }}
-          path: cosim/cosim_*.txt
+          path: cosim/build/${{ matrix.adpll }}_${{ matrix.corner }}.log
           if-no-files-found: ignore
