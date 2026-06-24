@@ -18,10 +18,10 @@ The design is grounded in the two standard texts on digital/CMOS PLLs:
   Wiley, 2006.** — the all-digital architecture: ring DCO with delay-element tuning (Ch. 2–3),
   thermometer / coarse–fine normalized DCO (Ch. 3, 5), the variable-phase / DCO-edge counter
   (Ch. 3), and the time-to-digital converter (Ch. 6).
-- **B. Razavi, *Design of CMOS Phase-Locked Loops*, Cambridge.** — loop dynamics: type-II PI loop
+- **B. Razavi, *Design of CMOS Phase-Locked Loops*, Cambridge.** — loop dynamics: type-II proportionalintegral loop
   filter, damping / phase-margin, and the bang-bang limit cycle.
 
-Per-block primary-paper citations (Kratyuk *TCAS-II* 2007 for the PI procedure, Hanumolu
+Per-block primary-paper citations (Kratyuk *TCAS-II* 2007 for the proportionalintegral procedure, Hanumolu
 *CICC* 2007 for the 1-bit sign detector, Da Dalt *TCAS-I* 2005 for gear shifting) are in the file
 headers and in [`docs/adpll_survey.md`](docs/adpll_survey.md).
 
@@ -35,7 +35,7 @@ wants directly (see `sim/tb_adpll.v`).
   target) and `adpll_phase_detector` (phase error: reference/variable phase accumulators + the
   `adpll_tdc` sub-cycle fraction). Both build on the shared `adpll_freq_counter` (Gray-CDC edge
   counter); `adpll_lock_detector` watches the settled tune code.
-- **Loop filters** (`rtl/loop_filter/`) — `bangbang` (1-bit sign), `proportionalintegral` (multi-bit PI,
+- **Loop filters** (`rtl/loop_filter/`) — `bangbang` (1-bit sign), `proportionalintegral` (multi-bit proportionalintegral,
   power-of-two α/β, anti-windup), `gearshift` (adaptive-step binary search). The error source is
   external, so the *same* `proportionalintegral` filter closes both the FLL (behind `adpll_freq_detector`)
   and the type-II phase loop (behind `adpll_phase_detector`) — only the widths/gains differ.
@@ -56,7 +56,7 @@ array from these blocks) — this repo ships the reusable parameterizable parts.
 rtl/             adpll_freq_counter, adpll_freq_detector, adpll_phase_detector,
                  adpll_lock_detector, adpll_tdc
 rtl/tech_cells   adpll_cell_delay / inv / nand2 / mux2 -- the PDK-specific primitives (THE retarget seam)
-rtl/loop_filter  bangbang / pi / gearshift loop filters
+rtl/loop_filter  bangbang / proportionalintegral / gearshift loop filters
 rtl/dco          binary / thermometer / muxtap / coarsefine ring DCOs
 rtl/axi          s_axi_adpll_csr (AXI4-Lite control/status)
 sim/             self-contained Icarus testbenches + ring_dco_behavioral.sv (sim-only DCO model)

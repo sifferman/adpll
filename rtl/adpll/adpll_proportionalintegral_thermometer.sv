@@ -26,7 +26,7 @@
 
 // adpll_proportionalintegral_thermometer
 //
-// Ref: Kratyuk TCAS-II 2007 (power-of-two alpha/beta PI); Staszewski Wiley 2006 Ch.3,5 (thermometer / unit-weighted). See the loop-filter / DCO source files for detail.
+// Ref: Kratyuk TCAS-II 2007 (power-of-two alpha/beta proportionalintegral); Staszewski Wiley 2006 Ch.3,5 (thermometer / unit-weighted). See the loop-filter / DCO source files for detail.
 // One ADPLL configuration = proportional-integral loop filter + thermometer DCO, assembled
 // from the generic adpll blocks (detector -> loop filter -> DCO, plus lock detect; no "controller"
 // wrapper). Parameterizable -- DcoNumTuneBits / FreqDetectorMaxEdgesPerWindow / FreqDetectorMaxWindowSize / the

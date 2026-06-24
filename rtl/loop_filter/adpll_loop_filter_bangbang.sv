@@ -58,7 +58,7 @@ module adpll_loop_filter_bangbang #(
 localparam int unsigned TuneMax = (1 << NumTuneBits) - 1;
 
 logic [NumTuneBits-1:0] integral_d, integral_q;   // integral path: the operating-point code
-logic [NumTuneBits-1:0] tune_d, tune_q;           // PI output to the DCO (integral + proportional)
+logic [NumTuneBits-1:0] tune_d, tune_q;           // proportionalintegral output to the DCO (integral + proportional)
 
 // Standard 3-argument clamp: min(max(lo, value), hi).
 function automatic int clamp(int lo, int value, int hi);

@@ -5,7 +5,7 @@
 // under Icarus (SYNTHESIS undefined) so the DCO compiles its behavioural clock model. Selects the
 // filter and DCO variant with plusdefines (testbench-only, not RTL):
 //   default              : adpll_loop_filter_bangbang (bang-bang) + ring_dco_binary (binary)
-//   -DCTRL_PROPORTIONALINTEGRAL         : adpll_loop_filter_proportionalintegral (PI)
+//   -DCTRL_PROPORTIONALINTEGRAL         : adpll_loop_filter_proportionalintegral (proportionalintegral)
 //   -DCTRL_GEARSHIFT      : adpll_loop_filter_gearshift (adaptive-step)
 //   -DDCO_THERM / -DDCO_MUXTAP / -DDCO_COARSEFINE : thermometer / mux-tap / coarse-fine DCO
 //
@@ -21,7 +21,7 @@ module tb_adpll;
   localparam int unsigned MUL      = 1707;      // target DCO edges per window (N)
   localparam int unsigned DIV      = 256;       // window length in ref cycles (M)
 
-  // bang-bang/gearshift lock on a clean code (+-1 LSB); the PI dithers a little more.
+  // bang-bang/gearshift lock on a clean code (+-1 LSB); the proportionalintegral dithers a little more.
 `ifdef CTRL_PROPORTIONALINTEGRAL
   localparam int unsigned LOCK_BAND = 2;
 `else

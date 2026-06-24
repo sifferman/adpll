@@ -26,7 +26,7 @@
 
 // adpll_bangbang_muxtap
 //
-// Ref: Hanumolu CICC 2007 / Da Dalt JSSC 2004 (bang-bang 1-bit sign PI); Kajiwara-Nakagawa style (variable ring length via tap mux tree). See the loop-filter / DCO source files for detail.
+// Ref: Hanumolu CICC 2007 / Da Dalt JSSC 2004 (bang-bang 1-bit sign proportionalintegral); Kajiwara-Nakagawa style (variable ring length via tap mux tree). See the loop-filter / DCO source files for detail.
 // One ADPLL configuration = bangbang loop filter + muxtap DCO, assembled
 // from the generic adpll blocks (detector -> loop filter -> DCO, plus lock detect; no "controller"
 // wrapper). Parameterizable -- DcoNumTuneBits / FreqDetectorMaxEdgesPerWindow / FreqDetectorMaxWindowSize / the

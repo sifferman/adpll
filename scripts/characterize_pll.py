@@ -5,14 +5,14 @@
 Closed-loop ADPLL characterizer for the 6 variants (2 controllers x 3 DCOs).
 
 Each DCO's *measured* SPICE frequency-vs-code curve (from gen_ring_dco_spice.py
---topology ...) drives the loop, and the two loop filters (bang-bang / PI) are
+--topology ...) drives the loop, and the two loop filters (bang-bang / proportionalintegral) are
 replicated EXACTLY from the RTL (src/adpll/controller/*.sv) + the shared lock detector
 (src/adpll/adpll_lock_detect.sv). For each (controller x DCO) it reports settle time,
 settled code, steady-state jitter, and lock success, and plots them.
 
 Validation: with the analytic behavioural curve f(tune) = 1 / (2*(1000+100*tune) ps) -- the
 same model the RTL behavioural DCO uses -- this reproduces the RTL sims (bang-bang 7938
-ref-cycles / tune 21, PI 4610 / tune 20), so the Python loop is faithful to the RTL.
+ref-cycles / tune 21, proportionalintegral 4610 / tune 20), so the Python loop is faithful to the RTL.
 """
 import argparse
 import os
@@ -182,7 +182,7 @@ def plot(rows, curves, out_dir, target_code=24):
     DCOLS = {"binary": "-", "thermometer": "--", "muxtap": ":"}
     DCOC = {"binary": "#1b9e77", "thermometer": "#e7298a", "muxtap": "#666600"}
     dcos = list(curves.keys())
-    short = lambda lbl: lbl.replace("bangbang", "bb").replace("proportionalintegral", "PI").replace("x", "×")
+    short = lambda lbl: lbl.replace("bangbang", "bb").replace("proportionalintegral", "proportionalintegral").replace("x", "×")
 
     fig, ax = plt.subplots(2, 2, figsize=(12, 8.5))
 
@@ -212,7 +212,7 @@ def plot(rows, curves, out_dir, target_code=24):
     ax[0, 1].set_title("Settle time (reference cycles)"); ax[0, 1].grid(axis="y", alpha=.3)
     ax[0, 1].legend(handles=[plt.Rectangle((0,0),1,1,color=CTRLC["bangbang"]),
                              plt.Rectangle((0,0),1,1,color=CTRLC["proportionalintegral"])],
-                    labels=["bang-bang", "PI"], fontsize=8)
+                    labels=["bang-bang", "proportionalintegral"], fontsize=8)
 
     # (1,0) acquisition trajectories — colour = controller, linestyle = DCO
     for r in rows:
@@ -220,7 +220,7 @@ def plot(rows, curves, out_dir, target_code=24):
                       label=short(r[0]))
     ax[1, 0].axhline(target_code, color="0.6", lw=1, ls="-.")
     ax[1, 0].set_title("Acquisition trajectory (tune vs. window)\n"
-                       "bang-bang staircases overlap (DCO-independent); PI slews per curve")
+                       "bang-bang staircases overlap (DCO-independent); proportionalintegral slews per curve")
     ax[1, 0].set_xlabel("measurement window"); ax[1, 0].set_ylabel("tune code")
     ax[1, 0].legend(fontsize=7, ncol=2); ax[1, 0].grid(alpha=.3)
 

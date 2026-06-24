@@ -26,7 +26,7 @@
 
 // adpll_bangbang_thermometer
 //
-// Ref: Hanumolu CICC 2007 / Da Dalt JSSC 2004 (bang-bang 1-bit sign PI); Staszewski Wiley 2006 Ch.3,5 (thermometer / unit-weighted). See the loop-filter / DCO source files for detail.
+// Ref: Hanumolu CICC 2007 / Da Dalt JSSC 2004 (bang-bang 1-bit sign proportionalintegral); Staszewski Wiley 2006 Ch.3,5 (thermometer / unit-weighted). See the loop-filter / DCO source files for detail.
 // One ADPLL configuration = bangbang loop filter + thermometer DCO, assembled
 // from the generic adpll blocks (detector -> loop filter -> DCO, plus lock detect; no "controller"
 // wrapper). Parameterizable -- DcoNumTuneBits / FreqDetectorMaxEdgesPerWindow / FreqDetectorMaxWindowSize / the

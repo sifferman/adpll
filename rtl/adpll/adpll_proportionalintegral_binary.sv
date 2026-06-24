@@ -26,7 +26,7 @@
 
 // adpll_proportionalintegral_binary
 //
-// Ref: Kratyuk TCAS-II 2007 (power-of-two alpha/beta PI); Staszewski Wiley 2006 Ch.2-3 (binary-weighted delay select). See the loop-filter / DCO source files for detail.
+// Ref: Kratyuk TCAS-II 2007 (power-of-two alpha/beta proportionalintegral); Staszewski Wiley 2006 Ch.2-3 (binary-weighted delay select). See the loop-filter / DCO source files for detail.
 // One ADPLL configuration = proportional-integral loop filter + binary DCO, assembled
 // from the generic adpll blocks (detector -> loop filter -> DCO, plus lock detect; no "controller"
 // wrapper). Parameterizable -- DcoNumTuneBits / FreqDetectorMaxEdgesPerWindow / FreqDetectorMaxWindowSize / the

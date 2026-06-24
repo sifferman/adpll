@@ -27,7 +27,7 @@ sim-adpll: ## Standalone digital ADPLL: ring DCO (behavioural) + FLL lock (iveri
 
 sim-adpll-survey: ## Compare the FLL loop filters (bang-bang / proportional-integral / gearshift): lock time + code
 	@mkdir -p sim_build
-	@for ctrl in "bang-bang:" "proportional-integral:-DCTRL_PROPORTIONALINTEGRAL" "gearshift:-DCTRL_GEARSHIFT"; do \
+	@for ctrl in "bang-bang:" "proportionalintegral:-DCTRL_PROPORTIONALINTEGRAL" "gearshift:-DCTRL_GEARSHIFT"; do \
 		name=$${ctrl%%:*}; def=$${ctrl#*:}; echo "==== loop filter: $$name ===="; \
 		iverilog -g2012 $$def -o sim_build/tb_adpll_$$name $(TS) $(CORE) sim/tb_adpll.v && \
 		vvp sim_build/tb_adpll_$$name | grep -E "LOCKED|PASS|FAIL"; \
@@ -35,8 +35,8 @@ sim-adpll-survey: ## Compare the FLL loop filters (bang-bang / proportional-inte
 
 sim-adpll-matrix: ## All 12 FLL variants (3 loop filters x 4 DCOs): lock time + settled tune
 	@mkdir -p sim_build
-	@printf "%-26s %-12s %-8s %s\n" "config (filter x dco)" "lock_cyc" "tune" "result"
-	@for ctrl in "bb:" "pi:-DCTRL_PROPORTIONALINTEGRAL" "gear:-DCTRL_GEARSHIFT"; do \
+	@printf "%-30s %-10s %-6s %s\n" "config (filter x dco)" "lock_cyc" "tune" "result"
+	@for ctrl in "bb:" "proportionalintegral:-DCTRL_PROPORTIONALINTEGRAL" "gear:-DCTRL_GEARSHIFT"; do \
 		for dco in "binary:" "therm:-DDCO_THERM" "muxtap:-DDCO_MUXTAP" "cfine:-DDCO_COARSEFINE"; do \
 			cn=$${ctrl%%:*}; cd=$${ctrl#*:}; dn=$${dco%%:*}; dd=$${dco#*:}; \
 			iverilog -g2012 $$cd $$dd -o sim_build/tb_mx_$${cn}_$${dn} $(TS) $(CORE) sim/tb_adpll.v 2>/dev/null && \
@@ -44,7 +44,7 @@ sim-adpll-matrix: ## All 12 FLL variants (3 loop filters x 4 DCOs): lock time + 
 			cyc=$$(echo "$$out" | grep -oE "lock_time=[0-9]+" | grep -oE "[0-9]+"); \
 			tune=$$(echo "$$out" | grep -oE "tune=[0-9]+ in-range" | grep -oE "[0-9]+"); \
 			res=$$(echo "$$out" | grep -oE "PASS|FAIL" | head -1); \
-			printf "%-26s %-12s %-8s %s\n" "$$cn x $$dn" "$${cyc:-N/A}" "$${tune:-N/A}" "$${res:-NO-LOCK}"; \
+			printf "%-30s %-10s %-6s %s\n" "$$cn x $$dn" "$${cyc:-N/A}" "$${tune:-N/A}" "$${res:-NO-LOCK}"; \
 		done; \
 	done
 

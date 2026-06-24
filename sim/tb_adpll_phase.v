@@ -2,11 +2,11 @@
 //
 // Testbench for the phase-domain ADPLL, assembled here (no "controller" wrapper) from:
 //   ring DCO -> adpll_tdc (sub-cycle phase) -> adpll_phase_detector (phase error)
-//            -> adpll_loop_filter_proportionalintegral (PI) -> adpll_lock_detector.
+//            -> adpll_loop_filter_proportionalintegral (proportionalintegral) -> adpll_lock_detector.
 // Runs under Icarus (SYNTHESIS undefined) so the DCO and TDC compile their behavioural models.
 // Unlike the frequency-locked tb_adpll, this loop nulls PHASE: the detector advances a reference
 // phase by fcw_i each reference cycle and the variable phase by the DCO edge count plus the TDC
-// fraction; the PI loop filter drives that phase error to zero. The same adpll_loop_filter_proportionalintegral
+// fraction; the proportionalintegral loop filter drives that phase error to zero. The same adpll_loop_filter_proportionalintegral
 // serves here and in the FLL -- only the error source (detector) and gains differ.
 //
 // 25 MHz reference (40 ns). With the behavioural DCO (half-period 1.0+0.1*tune ns), tune~=20 gives
@@ -58,7 +58,7 @@ module tb_adpll_phase;
       .valid_o    (valid)
   );
 
-  // Type-II PI: gentler gains than the FLL (Alpha=6/Beta=11), accumulator sized to the phase error.
+  // Type-II proportionalintegral: gentler gains than the FLL (Alpha=6/Beta=11), accumulator sized to the phase error.
   adpll_loop_filter_proportionalintegral #(
       .NumTuneBits(NUM_TUNE),
       .ErrorWidth (ERR_W),

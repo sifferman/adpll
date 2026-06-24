@@ -26,7 +26,7 @@
 
 // adpll_loop_filter_proportionalintegral
 //
-// Ref: Kratyuk, Hanumolu, Moon & Mayaram (IEEE TCAS-II 54(3), 2007), power-of-two alpha/beta PI.
+// Ref: Kratyuk, Hanumolu, Moon & Mayaram (IEEE TCAS-II 54(3), 2007), power-of-two alpha/beta proportionalintegral.
 // Proportional-integral loop filter: drives a signed error to zero and outputs the DCO tune code.
 //   tune = clamp(0, (error >>> AlphaShift) + (integral >>> BetaShift), TuneMax),  integral += error
 // with an anti-windup clamp on the integral. The error source is external, so this one filter
@@ -68,11 +68,11 @@ localparam int unsigned TuneMax = (1 << NumTuneBits) - 1;
 // Anti-windup limit: keep beta*accumulator inside the tune range.
 localparam logic signed [AccWidth-1:0] AccMax = AccWidth'(TuneMax) <<< BetaShift;
 
-// The PI sum is clamped through `int`; guard it cannot overflow that type.
+// The proportionalintegral sum is clamped through `int`; guard it cannot overflow that type.
 if (AccWidth + 2 > $bits(int)) $error("AccWidth+2 exceeds int width");
 
 logic signed [AccWidth-1:0] accumulator_d, accumulator_q;   // integral accumulator (anti-windup)
-logic [NumTuneBits-1:0]     tune_d, tune_q;                 // PI output to the DCO
+logic [NumTuneBits-1:0]     tune_d, tune_q;                 // proportionalintegral output to the DCO
 
 // Standard 3-argument clamp: min(max(lo, value), hi).
 function automatic int clamp(int lo, int value, int hi);
@@ -107,6 +107,6 @@ always_ff @(posedge clk_i or negedge rst_ni) begin
 end
 
 assign tune_o        = tune_q;
-assign lock_sample_o = tune_q;   // the PI loop settles to a near-static code; watch tune directly
+assign lock_sample_o = tune_q;   // the proportionalintegral loop settles to a near-static code; watch tune directly
 
 endmodule
