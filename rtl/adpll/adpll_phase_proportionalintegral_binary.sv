@@ -34,7 +34,7 @@
 // + proportional-integral loop filter + binary DCO, assembled from the generic adpll blocks (no
 // "controller" wrapper). Unlike the frequency-locked adpll_<filter>_<dco> configs (which null average
 // FREQUENCY via adpll_freq_detector), this nulls PHASE: the detector advances a reference phase by
-// fcw_i each reference cycle and the variable phase by the DCO edge count plus the adpll_tdc sub-cycle
+// fcw_i each reference cycle and the variable phase by the DCO edge count plus the adpll_tdc_flash sub-cycle
 // fraction; the type-II proportional-integral filter drives that phase error to zero, so
 // F_DCO = fcw * F_clk_i with zero static phase error [Kratyuk2007 sec.IV: a second-order loop suffices].
 //
@@ -56,6 +56,7 @@
 module adpll_phase_proportionalintegral_binary #(
     parameter  int unsigned DcoNumTuneBits                 = 7,
     parameter  int unsigned TdcPhaseWidth                  = 6,
+    parameter  int unsigned TdcDelayCellsBetweenSamples    = 1,
     parameter  int unsigned PhaseDetectorMaxEdgesPerWindow = (1 << 12) - 1,
     parameter  int unsigned PhaseDetectorFcwWidth          = 24,
     parameter  int unsigned PhaseDetectorErrorWidth        = 24,
@@ -82,20 +83,22 @@ module adpll_phase_proportionalintegral_binary #(
 
 wire signed [PhaseDetectorErrorWidth-1:0] phase_error;
 wire                                      phase_error_valid;
-wire [DcoNumTuneBits-1:0] dco_tune;
-wire [DcoNumTuneBits-1:0] lock_detector_sample;
+wire [DcoNumTuneBits-1:0]                 dco_tune;
+wire [DcoNumTuneBits-1:0]                 lock_detector_sample;
 wire [TdcPhaseWidth-1:0]                  tdc_phase;
 wire                                      dco_clk;
 
 // TDC: sub-cycle DCO phase sampled at the reference edge (flash delay line in synthesis; behavioural
 // $realtime model in iverilog -- same module name, file picked at build time, like the DCO).
-adpll_tdc #(
-    .PhaseWidth(TdcPhaseWidth)
-) adpll_tdc (
+adpll_tdc_flash #(
+    .PhaseWidth(TdcPhaseWidth),
+    .DelayCellsBetweenSamples(TdcDelayCellsBetweenSamples)
+) adpll_tdc_flash (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
     .dco_clk_i(dco_clk),
-    .phase_o  (tdc_phase)
+    .phase_o  (tdc_phase),
+    .period_valid_o()
 );
 
 // phase detector: reference phase (+= fcw_i) - variable phase (DCO edge count + TDC fraction) -> error

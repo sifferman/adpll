@@ -11,9 +11,9 @@ TS    = -c <(printf '+timescale+1ns/1ps\n')
 # stock Icarus, no PDK), NOT the structural rtl/dco/ + rtl/tech_cells/ (those are for synthesis/SPICE,
 # where yosys+slang elaborates the `Target` string-parameter cells). The ring's real freq-vs-code
 # curve is physical -> verified in SPICE, not here.
-# Exclude the structural adpll_tdc.sv (instantiates the gf180 adpll_cell_delay, unknown to iverilog) --
-# sims use the behavioural TDC model, like the behavioural DCO (the TDC boundary).
-CORE  = $(filter-out rtl/adpll_tdc.sv,$(wildcard rtl/*.sv rtl/loop_filter/*.sv)) \
+# The structural TDC lives in rtl/tdc/ (it instantiates the gf180 adpll_cell_delay, unknown to
+# iverilog), so the rtl/*.sv wildcard doesn't reach it; sims use the behavioural TDC + DCO models.
+CORE  = $(wildcard rtl/*.sv rtl/loop_filter/*.sv) \
         sim/ring_dco_behavioral.sv sim/adpll_tdc_behavioral.sv
 
 .PHONY: help sim-adpll sim-adpll-survey sim-adpll-matrix sim-adpll-phase sim-adpll-csr clean

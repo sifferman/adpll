@@ -5,7 +5,12 @@ The analog ring DCO runs in ngspice (extracted transistors), and everything else
 We use ngspice's XSPICE `d_cosim` feature.
 
 ```bash
-make cosim ADPLL=<cfg> CORNER=<corner>
+nix develop ../.. -c \
+  make -C cosim cosim \
+    ADPLL=adpll_bangbang_binary \
+    CORNER=typical \
+    PDK_ROOT=$PDK_ROOT \
+    IVL_PREFIX=/path/to/iverilog-libvvp
 ```
 
 1. LibreLane + Magic produces `ring.spice` (transistors + parasitics)
@@ -15,8 +20,3 @@ make cosim ADPLL=<cfg> CORNER=<corner>
 5. ngspice runs the testbench. Its `d_cosim` model runs the `.vvp` through `ivlng`.
 
 All artifacts go in a per-`(cfg, corner)` dir, `build/<cfg>/<corner>/`, so independent sims run in parallel.
-
-```bash
-nix develop ../.. -c make -C cosim cosim ADPLL=adpll_bangbang_binary CORNER=typical \
-    PDK_ROOT=$PDK_ROOT IVL_PREFIX=/path/to/iverilog-libvvp
-```

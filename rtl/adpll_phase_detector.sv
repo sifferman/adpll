@@ -30,19 +30,19 @@
 // Phase detector for a true PLL. Each reference cycle it advances a reference phase by the
 // frequency control word fcw_i (target DCO cycles per reference cycle, Q.PhaseWidth fixed point)
 // and the variable phase by the DCO edge count (adpll_freq_counter, 1-cycle window) plus the
-// sub-cycle phase from adpll_tdc; the signed difference is the phase error. Feed error_o to
+// sub-cycle phase from adpll_tdc_flash; the signed difference is the phase error. Feed error_o to
 // adpll_loop_filter_proportionalintegral -- nulling it phase-locks the DCO (F_DCO = fcw * F_clk_i).
 //
 // Parameters:
 //   - MaxEdgesPerWindow : max DCO edges in one reference cycle (sizes the edge counter)
 //   - FcwWidth          : frequency control word width (Q.PhaseWidth)
-//   - PhaseWidth        : fractional-phase resolution (matches adpll_tdc); the fixed-point fraction bits
+//   - PhaseWidth        : fractional-phase resolution (matches adpll_tdc_flash); the fixed-point fraction bits
 //   - ErrorWidth        : phase-error / accumulator width (holds the acquisition transient)
 // Ports:
 //   - clk_i, rst_ni, enable_i
 //   - fcw_i       : frequency control word, F_DCO/F_clk_i in Q.PhaseWidth (runtime)
 //   - dco_clk_i   : DCO clock feedback
-//   - tdc_phase_i : sub-cycle DCO phase at this reference edge (from adpll_tdc), Q.PhaseWidth
+//   - tdc_phase_i : sub-cycle DCO phase at this reference edge (from adpll_tdc_flash), Q.PhaseWidth
 //   - error_o     : signed phase error (variable phase - reference phase), valid with valid_o
 //   - valid_o     : one-cycle strobe marking a fresh error_o
 

@@ -54,7 +54,7 @@ temperature (PVT) variations."* A second-order (type-II) loop suffices: [Kratyuk
 |---|---|
 | `adpll_freq_counter` | Gray-coded DCO-edge counter over a runtime-length measurement window; frequency-to-digital primitive. Shared by both detectors. |
 | `adpll_lock_detector` | declares lock when the watched control code holds within ±`BandRadius` for `MinSamplesForLock` consecutive samples. Shared. |
-| `adpll_tdc` | time-to-digital converter: sub-cycle DCO phase at the reference edge (flash delay line of `adpll_cell_delay`s in synthesis / behavioural `$realtime` model in sim). Used only by `adpll_phase_detector`. |
+| `adpll_tdc_flash` | time-to-digital converter: sub-cycle DCO phase at the reference edge (flash delay line of `adpll_cell_delay`s in synthesis / behavioural `$realtime` model in sim). Used only by `adpll_phase_detector`. |
 
 ## DCO variants (interface `enable_i`, `tune_i[NumTuneBits-1:0]`, `clk_o`)
 
@@ -84,7 +84,7 @@ Two front ends produce a signed loop error from the DCO feedback; both build on
 | module | loop | error | source |
 |---|---|---|---|
 | `adpll_freq_detector` | FLL | `dco_edge_count − mul` over a `div`-cycle window (interface `mul_i/div_i`) | counter-based frequency detector, [Kratyuk2007 Fig. 2] |
-| `adpll_phase_detector` | PLL | accumulated phase error: reference phase (`+= fcw_i`) − variable phase (DCO edges + `adpll_tdc` fraction); interface `fcw_i/tdc_phase_i` | phase-domain ADPLL [Staszewski2006 §4–5] — nulls *phase*, not just average frequency |
+| `adpll_phase_detector` | PLL | accumulated phase error: reference phase (`+= fcw_i`) − variable phase (DCO edges + `adpll_tdc_flash` fraction); interface `fcw_i/tdc_phase_i` | phase-domain ADPLL [Staszewski2006 §4–5] — nulls *phase*, not just average frequency |
 
 ## Loop-filter variants (how to correct)
 

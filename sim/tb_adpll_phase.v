@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Testbench for the phase-domain ADPLL, assembled here (no "controller" wrapper) from:
-//   ring DCO -> adpll_tdc (sub-cycle phase) -> adpll_phase_detector (phase error)
+//   ring DCO -> adpll_tdc_flash (sub-cycle phase) -> adpll_phase_detector (phase error)
 //            -> adpll_loop_filter_proportionalintegral (proportionalintegral) -> adpll_lock_detector.
 // Runs under Icarus (SYNTHESIS undefined) so the DCO and TDC compile their behavioural models.
 // Unlike the frequency-locked tb_adpll, this loop nulls PHASE: the detector advances a reference
@@ -15,7 +15,7 @@
 
 module tb_adpll_phase;
   localparam int unsigned NUM_TUNE = 7;
-  localparam int unsigned PHASE_W  = 6;     // TDC fractional-phase resolution (adpll_tdc.PhaseWidth)
+  localparam int unsigned PHASE_W  = 6;     // TDC fractional-phase resolution (adpll_tdc_flash.PhaseWidth)
   localparam int unsigned FCW_W    = 24;
   localparam int unsigned ERR_W    = 24;    // phase-error / accumulator width
   localparam int unsigned FCW      = 427;   // 6.667 * 2^PHASE_W  (targets tune ~= 20)
@@ -40,7 +40,7 @@ module tb_adpll_phase;
       .clk_o   (dco_clk)
   );
 
-  adpll_tdc #(.PhaseWidth(PHASE_W)) u_tdc (
+  adpll_tdc_flash #(.PhaseWidth(PHASE_W)) u_tdc (
       .clk_i    (clk),
       .rst_ni   (rst_n),
       .dco_clk_i(dco_clk),

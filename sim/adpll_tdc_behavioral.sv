@@ -24,9 +24,9 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-// adpll_tdc (behavioural)
+// adpll_tdc_flash (behavioural)
 //
-// SIM-ONLY behavioural model of adpll_tdc. The real TDC in rtl/adpll_tdc.sv is a structural flash
+// SIM-ONLY behavioural model of adpll_tdc_flash. The real TDC in rtl/adpll_tdc_flash.sv is a structural flash
 // delay line (adpll_cell_delay taps) -- correct for synthesis/SPICE but slow to simulate and needs
 // the string-parameter cell tooling. The digital sims only need the sub-cycle phase, so they compile
 // THIS instead (the TDC boundary, mirroring sim/ring_dco_behavioral.sv): it reads the elapsed time
@@ -34,15 +34,24 @@
 // fraction of the cycle, scaled to the [0, 2*pi) phase code. Same ports/parameters as the structural
 // module, so it swaps in directly. The delay-line tap resolution is physical -> measured in SPICE.
 
-module adpll_tdc #(
-    parameter int unsigned PhaseWidth = 6
+module adpll_tdc_flash #(
+    parameter int unsigned PhaseWidth               = 6,
+    // Accepted for interface parity with the structural TDC; this ideal $realtime model normalises to
+    // one DCO period regardless, so the delay-line sizing knob has no effect here (it sets the real
+    // full-scale, which only the extracted/SPICE TDC exposes).
+    parameter int unsigned DelayCellsBetweenSamples = 1
 ) (
     input  logic                  clk_i,
     input  logic                  rst_ni,
 
     input  logic                  dco_clk_i,
-    output logic [PhaseWidth-1:0] phase_o
+    output logic [PhaseWidth-1:0] phase_o,
+    output logic                  period_valid_o
 );
+
+// The ideal model measures the period directly, so coverage is always valid (the structural TDC, with
+// its finite line, reports real coverage here).
+assign period_valid_o = 1'b1;
 
 realtime dco_rise_time, dco_rise_prev, dco_period;
 initial begin

@@ -53,26 +53,26 @@ module adpll_proportionalintegral_muxtap #(
     localparam int unsigned LoopFilterErrorWidth          = $clog2(FreqDetectorMaxEdgesPerWindow + 1) + 2,
     localparam int unsigned PostDividerDivideWidth        = $clog2(PostDividerMaxDivide + 1)
 ) (
-    input  logic                                              clk_i,
-    input  logic                                              rst_ni,
+    input  logic                                               clk_i,
+    input  logic                                               rst_ni,
 
-    input  logic                                              enable_i,
-    input  logic[$clog2(FreqDetectorMaxEdgesPerWindow+1)-1:0] ref_mul_i,  // target edge count N (set over CSR)
-    input  logic[FreqDetectorWindowSizeWidth-1:0]             ref_div_i,  // window length M, ref cycles (CSR)
-    input  logic[PostDividerDivideWidth-1:0]                  post_div_i,  // output divide K (set over CSR)
+    input  logic                                               enable_i,
+    input  logic [$clog2(FreqDetectorMaxEdgesPerWindow+1)-1:0] ref_mul_i,  // target edge count N (set over CSR)
+    input  logic [FreqDetectorWindowSizeWidth-1:0]             ref_div_i,  // window length M, ref cycles (CSR)
+    input  logic [PostDividerDivideWidth-1:0]                  post_div_i,  // output divide K (set over CSR)
 
-    output logic                                              clk_o,             // synthesized output = F_DCO / K
-    output logic                                              lock_o,
+    output logic                                               clk_o,             // synthesized output = F_DCO / K
+    output logic                                               lock_o,
 
-    output logic[DcoNumTuneBits-1:0]                          debug_dco_tune_o,  // internal tune, debug only
-    output logic                                              debug_dco_clk_o    // raw DCO oscillation, debug
+    output logic [DcoNumTuneBits-1:0]                          debug_dco_tune_o,  // internal tune, debug only
+    output logic                                               debug_dco_clk_o    // raw DCO oscillation, debug
 );
 
 
 wire signed [LoopFilterErrorWidth-1:0] loop_filter_error;
 wire                                   loop_filter_error_valid;
-wire [DcoNumTuneBits-1:0] dco_tune;
-wire [DcoNumTuneBits-1:0] lock_detector_sample;
+wire [DcoNumTuneBits-1:0]              dco_tune;
+wire [DcoNumTuneBits-1:0]              lock_detector_sample;
 wire                                   dco_clk;
 
 // detector: DCO edges over a ref_div_i window vs ref_mul_i -> signed frequency error
@@ -130,11 +130,11 @@ ring_dco_muxtap #(
 adpll_post_divider #(
     .DivisorWidth(PostDividerDivideWidth)
 ) adpll_post_divider (
-    .clk_i   (dco_clk),
-    .rst_ni  (rst_ni),
+    .clk_i    (dco_clk),
+    .rst_ni   (rst_ni),
     .enable_i(enable_i),
     .divisor_i(post_div_i),
-    .clk_o   (clk_o)
+    .clk_o    (clk_o)
 );
 
 assign debug_dco_tune_o = dco_tune;

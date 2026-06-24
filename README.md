@@ -33,7 +33,7 @@ wants directly (see `sim/tb_adpll.v`).
 
 - **Detectors** — `adpll_freq_detector` (frequency error: DCO-edge count over a runtime window vs a
   target) and `adpll_phase_detector` (phase error: reference/variable phase accumulators + the
-  `adpll_tdc` sub-cycle fraction). Both build on the shared `adpll_freq_counter` (Gray-CDC edge
+  `adpll_tdc_flash` sub-cycle fraction). Both build on the shared `adpll_freq_counter` (Gray-CDC edge
   counter); `adpll_lock_detector` watches the settled tune code.
 - **Loop filters** (`rtl/loop_filter/`) — `bangbang` (1-bit sign), `proportionalintegral` (multi-bit proportionalintegral,
   power-of-two α/β, anti-windup), `gearshift` (adaptive-step binary search). The error source is
@@ -54,7 +54,7 @@ array from these blocks) — this repo ships the reusable parameterizable parts.
 
 ```
 rtl/             adpll_freq_counter, adpll_freq_detector, adpll_phase_detector,
-                 adpll_lock_detector, adpll_tdc
+                 adpll_lock_detector, adpll_tdc_flash
 rtl/tech_cells   adpll_cell_delay / inv / nand2 / mux2 -- the PDK-specific primitives (THE retarget seam)
 rtl/loop_filter  bangbang / proportionalintegral / gearshift loop filters
 rtl/dco          binary / thermometer / muxtap / coarsefine ring DCOs

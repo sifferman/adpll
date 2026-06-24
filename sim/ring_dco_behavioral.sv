@@ -40,27 +40,27 @@
 // half_period = 1.0ns + 0.1ns*tune_i (illustrative); >= 1.0ns > 0 so there is never a zero-delay
 // loop. The numbers are not the silicon curve -- SPICE gives that.
 
-`define ADPLL_RING_DCO_BEHAVIOURAL(NAME)                                       \
-    logic    clk_r = 1'b1;                                                     \
-    realtime half_period;                                                      \
-    always begin                                                               \
-        if (enable_i) begin                                                    \
-            half_period = 1.0ns + 0.1ns * tune_i;                              \
-            #(half_period) clk_r = ~clk_r;                                     \
-        end else begin                                                         \
-            clk_r = 1'b1;                                                      \
-            #(1.0ns);                                                          \
-        end                                                                    \
-    end                                                                        \
+`define ADPLL_RING_DCO_BEHAVIOURAL(NAME)           \
+    logic    clk_r = 1'b1;                         \
+    realtime half_period;                          \
+    always begin                                   \
+        if (enable_i) begin                        \
+            half_period = 1.0ns + 0.1ns * tune_i;  \
+            #(half_period) clk_r = ~clk_r;         \
+        end else begin                             \
+            clk_r = 1'b1;                          \
+            #(1.0ns);                              \
+        end                                        \
+    end                                            \
     assign clk_o = clk_r
 
 module ring_dco_binary #(
     parameter int unsigned NumTuneBits = 7,
     parameter string       Target      = "behavioral"   // ignored (structural-DCO interface parity)
 ) (
-    input  logic                  enable_i,
-    input  logic[NumTuneBits-1:0] tune_i,
-    output logic                  clk_o
+    input  logic                   enable_i,
+    input  logic [NumTuneBits-1:0] tune_i,
+    output logic                   clk_o
 );
     `ADPLL_RING_DCO_BEHAVIOURAL(binary);
 endmodule
@@ -69,9 +69,9 @@ module ring_dco_thermometer #(
     parameter int unsigned NumTuneBits = 7,
     parameter string       Target      = "behavioral"
 ) (
-    input  logic                  enable_i,
-    input  logic[NumTuneBits-1:0] tune_i,
-    output logic                  clk_o
+    input  logic                   enable_i,
+    input  logic [NumTuneBits-1:0] tune_i,
+    output logic                   clk_o
 );
     `ADPLL_RING_DCO_BEHAVIOURAL(thermometer);
 endmodule
@@ -80,9 +80,9 @@ module ring_dco_muxtap #(
     parameter int unsigned NumTuneBits = 7,
     parameter string       Target      = "behavioral"
 ) (
-    input  logic                  enable_i,
-    input  logic[NumTuneBits-1:0] tune_i,
-    output logic                  clk_o
+    input  logic                   enable_i,
+    input  logic [NumTuneBits-1:0] tune_i,
+    output logic                   clk_o
 );
     `ADPLL_RING_DCO_BEHAVIOURAL(muxtap);
 endmodule
@@ -92,9 +92,9 @@ module ring_dco_coarsefine #(
     parameter int unsigned NumFineBits = 3,
     parameter string       Target      = "behavioral"
 ) (
-    input  logic                  enable_i,
-    input  logic[NumTuneBits-1:0] tune_i,
-    output logic                  clk_o
+    input  logic                   enable_i,
+    input  logic [NumTuneBits-1:0] tune_i,
+    output logic                   clk_o
 );
     `ADPLL_RING_DCO_BEHAVIOURAL(coarsefine);
 endmodule

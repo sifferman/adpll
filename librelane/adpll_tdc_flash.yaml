@@ -1,0 +1,45 @@
+# LibreLane Classic-flow config to harden adpll_tdc (the phase-domain TDC) as a standalone macro,
+# purely to extract a layout SPICE netlist for the gate-level phase cosim. Like ring_dco.yaml, the
+# SPICE comes from the .sv via the real flow (synth -> place -> route -> Magic extraction), so the
+# delay line carries real cell + parasitic delays -- which is the whole point of extracting it (a
+# zero-delay gate sim of the flash delay line can't produce a phase code).
+#
+#   nix develop -c librelane third_party/adpll/librelane/adpll_tdc.yaml \
+#       --pdk gf180mcuD --pdk-root <root> --scl gf180mcu_as_sc_mcu7t3v3
+#
+# Unlike the ring (a clockless oscillator), the TDC HAS a reference clock (clk_i samples the tap
+# flops); the dco_clk_i -> delay line -> flop path is a long *data* path by design, so timing-driven
+# resizing is disabled and the delay cells carry (* keep *)/(* dont_touch *) so the line survives.
+
+meta:
+  version: 2
+  flow: Classic
+
+DESIGN_NAME: adpll_tdc_flash
+
+VERILOG_FILES:
+- dir::../rtl/tech_cells/adpll_cell_delay.sv
+- dir::../rtl/tdc/adpll_tdc_flash.sv
+
+# slang elaborates the tech-cell string parameter; set Target to the gf180 3.3 V library.
+USE_SLANG: true
+SLANG_ARGUMENTS: ['--ignore-unknown-modules', '-G', 'Target="gf180mcu_as_sc_mcu7t3v3"']
+
+# clk_i samples the tap flops. Keep the period loose and disable timing-driven optimisation so the
+# flow doesn't try to "fix" (resize/remove) the intentionally-long dco_clk_i -> tap delay line.
+CLOCK_PORT: clk_i
+CLOCK_PERIOD: 40
+RUN_CTS: false
+RUN_POST_GRT_RESIZER_TIMING: false
+DESIGN_REPAIR_BUFFER_INPUT_PORTS: false
+
+# 2^6-1 = 63 delay taps + 63 sampler flops + a popcount adder tree -- bigger than the ring.
+FP_SIZING: absolute
+DIE_AREA: [0, 0, 180, 180]
+CORE_AREA: [5, 5, 175, 175]
+PL_TARGET_DENSITY_PCT: 35
+
+# Magic-based SPICE extraction (the netlist we feed to ngspice). Parasitic R/C if the PDK supports
+# RCX; otherwise device-level.
+MAGIC_EXT_USE_GDS: true
+RUN_MAGIC_STREAMOUT: true
