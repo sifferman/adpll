@@ -69,6 +69,9 @@ def deck(a, ports, vth, mul, div):
     L.append("Cout clk_o 0 2f")
     L.append("Clk lock_o 0 2f")
     L.append("X1 " + " ".join(ports) + f" {a.design}")
+    # Keep ONLY the two measured nodes. Without this ngspice stores every internal node of the whole
+    # PLL (~thousands) x every timestep -> GBs and an OOM on CI; a .save list flips saveall off.
+    L.append(".save lock_o debug_dco_clk_o")
     td = max(a.tstop_ns - 30.0, a.tstop_ns * 0.9)
     L += [f".tran {a.tstep_ps}p {a.tstop_ns}n uic",
           ".control", "run",

@@ -33,6 +33,7 @@ a_adc_en [en_a] [en_d] adcm
 a_dac_tune [t0 t1 t2 t3 t4 t5 t6] [ta0 ta1 ta2 ta3 ta4 ta5 ta6] dacm
 a_dac_lock [lock_d] [lock_a] dacm
 
+.save lock_a dco_clk
 .tran 20p 1000n uic
 .control
 run

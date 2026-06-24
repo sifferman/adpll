@@ -47,6 +47,7 @@ def deck(extracted, ngspice_dir, design, ports, code, bits, corner, vdd, temp,
     # instantiate the extracted ring in its declared port order; tune_i[k] tied above
     inst = " ".join(p if not p.startswith("tune_i") else p for p in ports)
     L.append(f"X1 {inst} {design}")
+    L.append(".save clk_o")   # keep only the measured node (else ngspice stores every internal node)
     L += [f".tran {tstep_ps}p {tstop_ns}n uic",
           ".control", "run",
           f"meas tran t_a WHEN v(clk_o)={vth:.4f} RISE={settle}",
