@@ -53,12 +53,13 @@ module adpll_phase_detector #(
     parameter  int unsigned PhaseWidth        = 6,
     parameter  int unsigned ErrorWidth        = 24
 ) (
-    input  logic                 clk_i,
-    input  logic                 rst_ni,
-    input  logic                 enable_i,
-    input  logic[FcwWidth-1:0]   fcw_i,
-    input  logic                 dco_clk_i,
-    input  logic[PhaseWidth-1:0] tdc_phase_i,
+    input  logic                  clk_i,
+    input  logic                  rst_ni,
+
+    input  logic                  enable_i,
+    input  logic [FcwWidth-1:0]   fcw_i,
+    input  logic                  dco_clk_i,
+    input  logic [PhaseWidth-1:0] tdc_phase_i,
 
     output logic signed [ErrorWidth-1:0] error_o,
     output logic                         valid_o

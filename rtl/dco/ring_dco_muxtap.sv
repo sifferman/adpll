@@ -45,9 +45,9 @@ module ring_dco_muxtap #(
     parameter int unsigned NumTuneBits = 7,
     parameter string       Target      = "behavioral"
 ) (
-    input  logic                  enable_i,
-    input  logic[NumTuneBits-1:0] tune_i,
-    output logic                  clk_o
+    input  logic                   enable_i,
+    input  logic [NumTuneBits-1:0] tune_i,
+    output logic                   clk_o
 );
 
 localparam int unsigned NumTaps = (1 << NumTuneBits);

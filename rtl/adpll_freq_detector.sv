@@ -52,6 +52,7 @@ module adpll_freq_detector #(
 ) (
     input  logic                       clk_i,
     input  logic                       rst_ni,
+
     input  logic                       enable_i,
     input  logic [EdgeCountWidth-1:0]  target_i,         // mul (multiply ratio N)
     input  logic [WindowSizeWidth-1:0] window_length_i,  // div (window length, reference cycles)

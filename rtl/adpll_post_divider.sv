@@ -31,30 +31,31 @@
 // band (clk_o = F_DCO / divide). Sits outside the loop, so it never affects lock.
 //
 // Parameters:
-//   - DivideWidth : bit-width of the divide-ratio input
+//   - DivisorWidth : bit-width of the divisor input
 // Ports:
 //   - clk_i, rst_ni, enable_i : DCO clock, async reset, run enable
-//   - divide_i : division ratio (0 or 1 passes the DCO clock straight through)
+//   - divisor_i : divisor (0 or 1 passes the DCO clock straight through)
 //   - clk_o    : divided clock, ~50% duty (high for floor(divide/2) DCO cycles)
 
 module adpll_post_divider #(
-    parameter int unsigned DivideWidth = 8
+    parameter int unsigned DivisorWidth = 8
 ) (
-    input  logic                  clk_i,
-    input  logic                  rst_ni,
-    input  logic                  enable_i,
-    input  logic[DivideWidth-1:0] divide_i,
-    output logic                  clk_o
+    input  logic                   clk_i,
+    input  logic                   rst_ni,
+
+    input  logic                   enable_i,
+    input  logic [DivisorWidth-1:0] divisor_i,
+    output logic                   clk_o
 );
 
-logic [DivideWidth-1:0] count_d, count_q;
+logic [DivisorWidth-1:0] count_d, count_q;
 logic                   clk_div_d, clk_div_q;
 
-wire passthrough = (divide_i <= 1);
-wire last_cycle  = (count_q == divide_i - 1'b1);
+wire passthrough = (divisor_i <= 1);
+wire last_cycle  = (count_q == divisor_i - 1'b1);
 
 assign count_d   = !enable_i ? '0 : (last_cycle ? '0 : count_q + 1'b1);
-assign clk_div_d = !enable_i ? 1'b0 : (count_q < (divide_i >> 1));   // high for the first half
+assign clk_div_d = !enable_i ? 1'b0 : (count_q < (divisor_i >> 1));   // high for the first half
 
 always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin

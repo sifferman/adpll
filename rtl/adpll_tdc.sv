@@ -49,6 +49,7 @@ module adpll_tdc #(
 ) (
     input  logic                  clk_i,
     input  logic                  rst_ni,
+
     input  logic                  dco_clk_i,
     output logic [PhaseWidth-1:0] phase_o
 );

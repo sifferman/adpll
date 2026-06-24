@@ -127,12 +127,12 @@ ring_dco_muxtap #(
 );
 
 adpll_post_divider #(
-    .DivideWidth(PostDividerDivideWidth)
+    .DivisorWidth(PostDividerDivideWidth)
 ) adpll_post_divider (
     .clk_i   (dco_clk),
     .rst_ni  (rst_ni),
     .enable_i(enable_i),
-    .divide_i(post_div_i),
+    .divisor_i(post_div_i),
     .clk_o   (clk_o)
 );
 
