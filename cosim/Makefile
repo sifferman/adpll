@@ -57,7 +57,11 @@ LOG    := $(B)/$(ADPLL)_$(CORNER).log
 .PHONY: cosim clean
 .DELETE_ON_ERROR:
 
-cosim: $(DECK) $(GL_VVP) $(B)/ring.spice ## Run the gate-level cosim to lock (ADPLL=, CORNER=)
+# The deck is regenerated every run (it's instant and keyed on MUL/DIV/REF, which aren't in any file
+# name); the slow artifacts (ring.spice, the netlist, the vvp) are file targets and only rebuild on change.
+cosim: $(GL_VVP) $(B)/ring.spice ## Run the gate-level cosim to lock (ADPLL=, CORNER=, MUL=, DIV=)
+	./gen_ivlng_deck.py --vvp $(notdir $(GL_VVP)) --ring-subckt $(RINGDCO) --corner $(CORNER) \
+	  --ref-mhz $(REF_MHZ) --mul $(MUL) --div $(DIV) --post-div $(POST_DIV) > $(DECK)
 	@echo "== ngspice gate-level cosim ($(ADPLL) @ $(CORNER)) =="
 	cd $(B) && env -u DISPLAY PDK_ROOT=$(PDK_ROOT) \
 	  LD_LIBRARY_PATH="$$LD_LIBRARY_PATH:$(IVLNG_LIBS)" PATH="$(IVL_PREFIX)/bin:$$PATH" \

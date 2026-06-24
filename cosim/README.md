@@ -36,9 +36,10 @@ ngspice drives through `ivlng`.
 ## Files
 
 - `Makefile` — the whole flow as file targets (so only what changed rebuilds); artifacts go in `build/`.
-- `gen_ivlng_deck.py` — generates the ngspice deck from the gate netlist + the ring `.subckt`: ties
-  `ref_mul_i`/`ref_div_i`/`post_div_i` to constant rails, wires the adc/dac bridges and the ring, and
-  emits the `d_cosim` port vector in module-declaration order (each bus **MSB-first**).
+- `gen_ivlng_deck.py` — emits the ngspice deck. The synthesized loop's port interface is fixed (all 12
+  wrappers share it; the Makefile pins the synth shrink), so the `d_cosim` port vector is a constant
+  template — nothing is parsed. Only `--mul`/`--div`/`--post-div` (tied to rails, MSB-first), the ring
+  `.subckt` name, `--corner`, and `--ref-mhz` vary.
 - `build/` (git-ignored) — generated: `ring_bb.v`, hardened `ring.spice`, `<cfg>_gl.v`, the `vvp`,
   the deck, and the run log.
 
