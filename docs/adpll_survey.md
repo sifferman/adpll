@@ -91,13 +91,13 @@ Two front ends produce a signed loop error from the DCO feedback; both build on
 Each maps the signed error to a DCO tune code; all are proportional-integral (PI):
 [Kratyuk2007 §IV-C] *"A digital equivalent of an analog loop filter consists of a proportional
 path with a gain α and an integral path with a gain β."* Because the error source is external, the
-**same `pi` filter** closes both the linear FLL (behind `adpll_freq_detector`) and the type-II
+**same `proportionalintegral` filter** closes both the FLL (behind `adpll_freq_detector`) and the type-II
 phase loop (behind `adpll_phase_detector`) — only the widths/gains differ.
 
 | module | filter | source |
 |---|---|---|
 | `adpll_loop_filter_bangbang` | **bang-bang** PI: 1-bit (sign) error, integer gains | [Hanumolu2007 §IV-A] *"A DFF simply detects the sign of the phase error and hence serves as a 1-bit TDC"*; bang-bang dynamics [DaDalt2004] |
-| `adpll_loop_filter_pi` | **linear** PI: multi-bit error, power-of-two α/β shifts, anti-windup (also closes the phase loop) | full [Kratyuk2007] procedure; gains quantized to powers of two ([Kratyuk2007 §V] *"α ≈ 2⁻³, β ≈ 2⁻⁷"*) |
+| `adpll_loop_filter_proportionalintegral` | **proportional-integral**: multi-bit error, power-of-two α/β shifts, anti-windup (also closes the phase loop) | full [Kratyuk2007] procedure; gains quantized to powers of two ([Kratyuk2007 §V] *"α ≈ 2⁻³, β ≈ 2⁻⁷"*) |
 | `adpll_loop_filter_gearshift` | **adaptive-step** bang-bang: step `1<<gear`, downshift a gear on each error-sign reversal | gear shifting [DaDalt2005 §V]; a coarse binary search that auto-refines to a ±1 LSB limit cycle (fast lock, no Kp/Ki tuning) |
 
 ## Results
@@ -107,11 +107,11 @@ phase loop (behind `adpll_phase_detector`) — only the widths/gains differ.
 | loop filter | settled tune | lock time (ref cycles) | notes |
 |---|---|---|---|
 | bang-bang PI | 21 | 7938 | no gain matching; clean ±1 LSB limit cycle |
-| linear PI | 20 | 4610 | faster + exact, **but** required a tiny proportional gain (`AlphaShift=10`) — a larger α slams tune to a rail and oscillates rail-to-rail on a coarse DCO (huge cold-start error) |
-| gear-shift | 20 | 4610 | binary-search acquisition (step halves on each sign reversal); as fast as linear PI with **no** Kp/Ki tuning |
+| PI | 20 | 4610 | faster + exact, **but** required a tiny proportional gain (`AlphaShift=10`) — a larger α slams tune to a rail and oscillates rail-to-rail on a coarse DCO (huge cold-start error) |
+| gear-shift | 20 | 4610 | binary-search acquisition (step halves on each sign reversal); as fast as PI with **no** Kp/Ki tuning |
 
 All three FLL loop filters pass against all four DCOs — `make sim-adpll-matrix` (3 × 4 = 12 variants,
-bang-bang settles tune 21, linear/gearshift tune 20). The phase-domain PLL is measured separately
+bang-bang settles tune 21, proportional-integral/gearshift tune 20). The phase-domain PLL is measured separately
 (`make sim-adpll-phase`, fcw=427=6.667·2⁶, AlphaShift=6/BetaShift=11): it **phase**-locks tune≈21 in
 **42 ref-cycles** and holds steady-state tune in [18,22] about the ideal 20.
 
@@ -119,8 +119,8 @@ bang-bang settles tune 21, linear/gearshift tune 20). The phase-domain PLL is me
 
 The acquisition trajectory (above, `-DTRACE`) makes the difference visual: the bang-bang loop
 steps ±1 LSB/window — a slow staircase that then hunts in a ±1 LSB limit cycle around the
-target — while the linear loop slews proportionally to the error and settles in ~58 % of the
-time. Finding: the linear PI is faster and more accurate *once gains are matched to K_DCO*, but
+target — while the proportional-integral loop slews proportionally to the error and settles in ~58 % of the
+time. Finding: the PI is faster and more accurate *once gains are matched to K_DCO*, but
 on a coarse DCO it needs that care (small α / integral-dominant acquisition); the bang-bang
 needs none and is inherently PVT-robust — which is why bang-bang dominates coarse ADPLLs.
 
@@ -188,4 +188,4 @@ Ethernet (PLL `i` = four words at byte offset `i*0x10`: `CTRL`/`MUL`/`DIV`/`STAT
 pads** — control rides the existing Ethernet→AXI→CSR path and observability is the per-PLL
 `STATUS` (lock+tune); the muxed observation is not pad-routed (analog pads can't carry routed
 digital, and the padring is full). `make sim-adpll-array` programs all 12 over the CSR and confirms
-each locks (bang-bang 21, linear/gearshift 20) plus the mux tracks the selection.
+each locks (bang-bang 21, proportional-integral/gearshift 20) plus the mux tracks the selection.

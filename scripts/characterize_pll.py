@@ -5,14 +5,14 @@
 Closed-loop ADPLL characterizer for the 6 variants (2 controllers x 3 DCOs).
 
 Each DCO's *measured* SPICE frequency-vs-code curve (from gen_ring_dco_spice.py
---topology ...) drives the loop, and the two loop filters (bang-bang / linear PI) are
+--topology ...) drives the loop, and the two loop filters (bang-bang / PI) are
 replicated EXACTLY from the RTL (src/adpll/controller/*.sv) + the shared lock detector
 (src/adpll/adpll_lock_detect.sv). For each (controller x DCO) it reports settle time,
 settled code, steady-state jitter, and lock success, and plots them.
 
 Validation: with the analytic behavioural curve f(tune) = 1 / (2*(1000+100*tune) ps) -- the
 same model the RTL behavioural DCO uses -- this reproduces the RTL sims (bang-bang 7938
-ref-cycles / tune 21, linear 4610 / tune 20), so the Python loop is faithful to the RTL.
+ref-cycles / tune 21, PI 4610 / tune 20), so the Python loop is faithful to the RTL.
 """
 import argparse
 import os
@@ -62,7 +62,7 @@ def run_loop(freq_of_code, bits, ctrl, mul, div, ref_ns, max_windows=4000, post_
             integ = clamp(integ + d, 0, tune_max)           # IntegralGain=1
             tune = clamp(integ + d, 0, tune_max)            # ProportionalGain=1
             watched = integ                                  # detector watches the integral code
-        elif ctrl == "linear":
+        elif ctrl == "proportionalintegral":
             e = m - mul
             acc = clamp(acc + e, 0, acc_max)                # anti-windup
             tune = clamp((e >> ALPHA) + (acc >> BETA), 0, tune_max)
@@ -141,7 +141,7 @@ def main():
 
     if args.validate:
         print("# validation against RTL behavioural curve (expect bb~7938/tune21, lin~4610/tune20)")
-        for ctrl in ("bangbang", "linear"):
+        for ctrl in ("bangbang", "proportionalintegral"):
             r = run_loop(analytic_curve, 7, ctrl, 1707, 256, 40.0)
             print(f"  {ctrl:9s} settle={r['settle_cyc']} cyc  tune={r['tune']}  "
                   f"jitter={r['jitter_lsb']} LSB  locked={r['locked']}")
@@ -163,7 +163,7 @@ def main():
     print(f"# {'variant':22s} {'tgt_MHz':>8} {'mul':>5} {'settle_cyc':>10} {'settle_us':>10} {'tune':>5} {'freq_MHz':>9} {'jitter':>7} {'lock':>5}")
     for dco in curves:
         tgt = curves[dco](args.target_code) / 1e6
-        for ctrl in ("bangbang", "linear"):
+        for ctrl in ("bangbang", "proportionalintegral"):
             r = run_loop(curves[dco], args.bits, ctrl, mul_of[dco], args.div, args.ref_ns)
             rows.append((f"{ctrl}x{dco}", ctrl, dco, r))
             print(f"  {ctrl+' x '+dco:22s} {tgt:>8.1f} {mul_of[dco]:>5} {r['settle_cyc']:>10} {r['settle_us']:>10.2f} "
@@ -178,11 +178,11 @@ def plot(rows, curves, out_dir, target_code=24):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     os.makedirs(out_dir, exist_ok=True)
-    CTRLC = {"bangbang": "#7570b3", "linear": "#d95f02"}
+    CTRLC = {"bangbang": "#7570b3", "proportionalintegral": "#d95f02"}
     DCOLS = {"binary": "-", "thermometer": "--", "muxtap": ":"}
     DCOC = {"binary": "#1b9e77", "thermometer": "#e7298a", "muxtap": "#666600"}
     dcos = list(curves.keys())
-    short = lambda lbl: lbl.replace("bangbang", "bb").replace("linear", "lin").replace("x", "×")
+    short = lambda lbl: lbl.replace("bangbang", "bb").replace("proportionalintegral", "PI").replace("x", "×")
 
     fig, ax = plt.subplots(2, 2, figsize=(12, 8.5))
 
@@ -211,8 +211,8 @@ def plot(rows, curves, out_dir, target_code=24):
     ax[0, 1].set_xticks(xs); ax[0, 1].set_xticklabels(labels, rotation=35, ha="right", fontsize=8)
     ax[0, 1].set_title("Settle time (reference cycles)"); ax[0, 1].grid(axis="y", alpha=.3)
     ax[0, 1].legend(handles=[plt.Rectangle((0,0),1,1,color=CTRLC["bangbang"]),
-                             plt.Rectangle((0,0),1,1,color=CTRLC["linear"])],
-                    labels=["bang-bang", "linear PI"], fontsize=8)
+                             plt.Rectangle((0,0),1,1,color=CTRLC["proportionalintegral"])],
+                    labels=["bang-bang", "PI"], fontsize=8)
 
     # (1,0) acquisition trajectories — colour = controller, linestyle = DCO
     for r in rows:
@@ -220,7 +220,7 @@ def plot(rows, curves, out_dir, target_code=24):
                       label=short(r[0]))
     ax[1, 0].axhline(target_code, color="0.6", lw=1, ls="-.")
     ax[1, 0].set_title("Acquisition trajectory (tune vs. window)\n"
-                       "bang-bang staircases overlap (DCO-independent); linear slews per curve")
+                       "bang-bang staircases overlap (DCO-independent); PI slews per curve")
     ax[1, 0].set_xlabel("measurement window"); ax[1, 0].set_ylabel("tune code")
     ax[1, 0].legend(fontsize=7, ncol=2); ax[1, 0].grid(alpha=.3)
 

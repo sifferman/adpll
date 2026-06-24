@@ -5,7 +5,7 @@
 // under Icarus (SYNTHESIS undefined) so the DCO compiles its behavioural clock model. Selects the
 // filter and DCO variant with plusdefines (testbench-only, not RTL):
 //   default              : adpll_loop_filter_bangbang (bang-bang) + ring_dco_binary (binary)
-//   -DCTRL_LINEAR         : adpll_loop_filter_pi (linear PI)
+//   -DCTRL_PROPORTIONALINTEGRAL         : adpll_loop_filter_proportionalintegral (PI)
 //   -DCTRL_GEARSHIFT      : adpll_loop_filter_gearshift (adaptive-step)
 //   -DDCO_THERM / -DDCO_MUXTAP / -DDCO_COARSEFINE : thermometer / mux-tap / coarse-fine DCO
 //
@@ -21,8 +21,8 @@ module tb_adpll;
   localparam int unsigned MUL      = 1707;      // target DCO edges per window (N)
   localparam int unsigned DIV      = 256;       // window length in ref cycles (M)
 
-  // bang-bang/gearshift lock on a clean code (+-1 LSB); the linear PI dithers a little more.
-`ifdef CTRL_LINEAR
+  // bang-bang/gearshift lock on a clean code (+-1 LSB); the PI dithers a little more.
+`ifdef CTRL_PROPORTIONALINTEGRAL
   localparam int unsigned LOCK_BAND = 2;
 `else
   localparam int unsigned LOCK_BAND = 1;
@@ -66,8 +66,8 @@ module tb_adpll;
       .valid_o        (valid)
   );
 
-`ifdef CTRL_LINEAR
-  adpll_loop_filter_pi        #(.NumTuneBits(NUM_TUNE), .ErrorWidth(ERR_W)) u_flt (
+`ifdef CTRL_PROPORTIONALINTEGRAL
+  adpll_loop_filter_proportionalintegral        #(.NumTuneBits(NUM_TUNE), .ErrorWidth(ERR_W)) u_flt (
 `elsif CTRL_GEARSHIFT
   adpll_loop_filter_gearshift #(.NumTuneBits(NUM_TUNE), .ErrorWidth(ERR_W)) u_flt (
 `else

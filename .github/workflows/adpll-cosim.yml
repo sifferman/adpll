@@ -26,10 +26,10 @@ jobs:
           - adpll_bangbang_thermometer
           - adpll_bangbang_muxtap
           - adpll_bangbang_coarsefine
-          - adpll_linear_binary
-          - adpll_linear_thermometer
-          - adpll_linear_muxtap
-          - adpll_linear_coarsefine
+          - adpll_proportionalintegral_binary
+          - adpll_proportionalintegral_thermometer
+          - adpll_proportionalintegral_muxtap
+          - adpll_proportionalintegral_coarsefine
           - adpll_gearshift_binary
           - adpll_gearshift_thermometer
           - adpll_gearshift_muxtap

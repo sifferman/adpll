@@ -25,9 +25,9 @@ sim-adpll: ## Standalone digital ADPLL: ring DCO (behavioural) + FLL lock (iveri
 	iverilog -g2012 -o sim_build/tb_adpll $(TS) $(CORE) sim/tb_adpll.v
 	vvp sim_build/tb_adpll
 
-sim-adpll-survey: ## Compare the FLL loop filters (bang-bang / linear / gearshift): lock time + code
+sim-adpll-survey: ## Compare the FLL loop filters (bang-bang / proportional-integral / gearshift): lock time + code
 	@mkdir -p sim_build
-	@for ctrl in "bang-bang:" "linear:-DCTRL_LINEAR" "gearshift:-DCTRL_GEARSHIFT"; do \
+	@for ctrl in "bang-bang:" "proportional-integral:-DCTRL_PROPORTIONALINTEGRAL" "gearshift:-DCTRL_GEARSHIFT"; do \
 		name=$${ctrl%%:*}; def=$${ctrl#*:}; echo "==== loop filter: $$name ===="; \
 		iverilog -g2012 $$def -o sim_build/tb_adpll_$$name $(TS) $(CORE) sim/tb_adpll.v && \
 		vvp sim_build/tb_adpll_$$name | grep -E "LOCKED|PASS|FAIL"; \
@@ -36,7 +36,7 @@ sim-adpll-survey: ## Compare the FLL loop filters (bang-bang / linear / gearshif
 sim-adpll-matrix: ## All 12 FLL variants (3 loop filters x 4 DCOs): lock time + settled tune
 	@mkdir -p sim_build
 	@printf "%-26s %-12s %-8s %s\n" "config (filter x dco)" "lock_cyc" "tune" "result"
-	@for ctrl in "bb:" "lin:-DCTRL_LINEAR" "gear:-DCTRL_GEARSHIFT"; do \
+	@for ctrl in "bb:" "pi:-DCTRL_PROPORTIONALINTEGRAL" "gear:-DCTRL_GEARSHIFT"; do \
 		for dco in "binary:" "therm:-DDCO_THERM" "muxtap:-DDCO_MUXTAP" "cfine:-DDCO_COARSEFINE"; do \
 			cn=$${ctrl%%:*}; cd=$${ctrl#*:}; dn=$${dco%%:*}; dd=$${dco#*:}; \
 			iverilog -g2012 $$cd $$dd -o sim_build/tb_mx_$${cn}_$${dn} $(TS) $(CORE) sim/tb_adpll.v 2>/dev/null && \
@@ -52,7 +52,7 @@ sim-adpll-phase: ## Phase-domain ADPLL (TDC + reference/variable phase accumulat
 	@mkdir -p sim_build
 	iverilog -g2012 -o sim_build/tb_adpll_phase $(TS) \
 		rtl/adpll_freq_counter.sv rtl/adpll_lock_detector.sv sim/adpll_tdc_behavioral.sv rtl/adpll_phase_detector.sv \
-		rtl/loop_filter/adpll_loop_filter_pi.sv sim/ring_dco_behavioral.sv sim/tb_adpll_phase.v
+		rtl/loop_filter/adpll_loop_filter_proportionalintegral.sv sim/ring_dco_behavioral.sv sim/tb_adpll_phase.v
 	vvp sim_build/tb_adpll_phase | grep -E "LOCKED|PASS|FAIL"
 
 sim-adpll-csr: ## CSR (s_axi_adpll_csr) AXI4-Lite unit test -- cocotb + cocotbext-axi (pip install cocotb cocotbext-axi)

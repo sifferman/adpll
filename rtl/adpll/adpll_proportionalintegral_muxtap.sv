@@ -24,10 +24,10 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-// adpll_linear_binary
+// adpll_proportionalintegral_muxtap
 //
-// Ref: Kratyuk TCAS-II 2007 (linear power-of-two alpha/beta PI); Staszewski Wiley 2006 Ch.2-3 (binary-weighted delay select). See the loop-filter / DCO source files for detail.
-// One ADPLL configuration = linear loop filter + binary DCO, assembled
+// Ref: Kratyuk TCAS-II 2007 (power-of-two alpha/beta PI); Kajiwara-Nakagawa style (variable ring length via tap mux tree). See the loop-filter / DCO source files for detail.
+// One ADPLL configuration = proportional-integral loop filter + muxtap DCO, assembled
 // from the generic adpll blocks (detector -> loop filter -> DCO, plus lock detect; no "controller"
 // wrapper). Parameterizable -- DcoNumTuneBits / FreqDetectorMaxEdgesPerWindow / FreqDetectorMaxWindowSize / the
 // lock criterion (LockMinSamplesForLock / LockBandRadius) size the tune code, edge counter, window and lock band (defaults are the full-rate 7/24/16 config; shrink
@@ -42,7 +42,7 @@
 //   - debug_dco_tune_o : internal DCO tune code, debug observation only
 //   - debug_dco_clk_o  : raw DCO clock, debug observation only
 
-module adpll_linear_binary #(
+module adpll_proportionalintegral_muxtap #(
     parameter  int unsigned DcoNumTuneBits                = 7,
     parameter  int unsigned FreqDetectorMaxEdgesPerWindow = (1 << 24) - 1,
     parameter  int unsigned FreqDetectorMaxWindowSize     = (1 << 16) - 1,
@@ -90,10 +90,10 @@ adpll_freq_detector #(
 );
 
 // loop filter: maps the frequency error to the DCO tune code
-adpll_loop_filter_pi #(
+adpll_loop_filter_proportionalintegral #(
     .NumTuneBits(DcoNumTuneBits),
     .ErrorWidth (LoopFilterErrorWidth)
-) adpll_loop_filter_pi (
+) adpll_loop_filter_proportionalintegral (
     .clk_i        (clk_i),
     .rst_ni       (rst_ni),
     .enable_i     (enable_i),
@@ -117,10 +117,10 @@ adpll_lock_detector #(
     .lock_o         (lock_o)
 );
 
-ring_dco_binary #(
+ring_dco_muxtap #(
     .NumTuneBits(DcoNumTuneBits),
     .Target("gf180mcu_as_sc_mcu7t3v3")
-) ring_dco_binary (
+) ring_dco_muxtap (
     .enable_i(enable_i),
     .tune_i  (tune),
     .clk_o   (dco_clk)

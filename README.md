@@ -21,7 +21,7 @@ The design is grounded in the two standard texts on digital/CMOS PLLs:
 - **B. Razavi, *Design of CMOS Phase-Locked Loops*, Cambridge.** — loop dynamics: type-II PI loop
   filter, damping / phase-margin, and the bang-bang limit cycle.
 
-Per-block primary-paper citations (Kratyuk *TCAS-II* 2007 for the linear PI procedure, Hanumolu
+Per-block primary-paper citations (Kratyuk *TCAS-II* 2007 for the PI procedure, Hanumolu
 *CICC* 2007 for the 1-bit sign detector, Da Dalt *TCAS-I* 2005 for gear shifting) are in the file
 headers and in [`docs/adpll_survey.md`](docs/adpll_survey.md).
 
@@ -35,9 +35,9 @@ wants directly (see `sim/tb_adpll.v`).
   target) and `adpll_phase_detector` (phase error: reference/variable phase accumulators + the
   `adpll_tdc` sub-cycle fraction). Both build on the shared `adpll_freq_counter` (Gray-CDC edge
   counter); `adpll_lock_detector` watches the settled tune code.
-- **Loop filters** (`rtl/loop_filter/`) — `bangbang` (1-bit sign), `pi` (multi-bit linear PI,
+- **Loop filters** (`rtl/loop_filter/`) — `bangbang` (1-bit sign), `proportionalintegral` (multi-bit PI,
   power-of-two α/β, anti-windup), `gearshift` (adaptive-step binary search). The error source is
-  external, so the *same* `pi` filter closes both the linear FLL (behind `adpll_freq_detector`)
+  external, so the *same* `proportionalintegral` filter closes both the FLL (behind `adpll_freq_detector`)
   and the type-II phase loop (behind `adpll_phase_detector`) — only the widths/gains differ.
 - **DCOs** (`rtl/dco/`) — `binary`, `thermometer`, `muxtap`, `coarsefine` ring oscillators.
 - **Tech cells** (`rtl/tech_cells/`) — `adpll_cell_delay`/`_inv`/`_nand2`/`_mux2`, the only PDK-specific
@@ -68,7 +68,7 @@ docs/            adpll_survey.md (the variant survey, citations, results) + figu
 
 ```sh
 make sim-adpll          # ring DCO oscillates + the loop locks
-make sim-adpll-survey   # compare the FLL loop filters (bang-bang / linear / gearshift)
+make sim-adpll-survey   # compare the FLL loop filters (bang-bang / proportional-integral / gearshift)
 make sim-adpll-matrix   # all 12 FLL variants (3 loop filters x 4 DCOs)
 make sim-adpll-phase    # phase-domain ADPLL (TDC): true phase lock
 make sim-adpll-csr      # single-PLL CSR over AXI4-Lite

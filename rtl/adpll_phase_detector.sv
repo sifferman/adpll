@@ -31,7 +31,7 @@
 // frequency control word fcw_i (target DCO cycles per reference cycle, Q.PhaseWidth fixed point)
 // and the variable phase by the DCO edge count (adpll_freq_counter, 1-cycle window) plus the
 // sub-cycle phase from adpll_tdc; the signed difference is the phase error. Feed error_o to
-// adpll_loop_filter_pi -- nulling it phase-locks the DCO (F_DCO = fcw * F_clk_i).
+// adpll_loop_filter_proportionalintegral -- nulling it phase-locks the DCO (F_DCO = fcw * F_clk_i).
 //
 // Parameters:
 //   - MaxEdgesPerWindow : max DCO edges in one reference cycle (sizes the edge counter)

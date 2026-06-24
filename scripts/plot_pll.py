@@ -169,7 +169,7 @@ def plot_trajectory(trajs, outpath):
     ax.axhline(20, color="0.6", ls="--", lw=1, label="target ≈ 20")
     ax.set_xlabel("reference cycles since enable")
     ax.set_ylabel("DCO tune code")
-    ax.set_title("ADPLL acquisition trajectory: bang-bang vs. linear PI\n"
+    ax.set_title("ADPLL acquisition trajectory: bang-bang vs. PI\n"
                  "(behavioural DCO, mul=1707, div=256)")
     ax.grid(True, alpha=0.3)
     ax.legend(loc="lower right")

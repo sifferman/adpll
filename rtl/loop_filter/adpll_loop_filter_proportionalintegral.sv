@@ -24,13 +24,13 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-// adpll_loop_filter_pi
+// adpll_loop_filter_proportionalintegral
 //
 // Ref: Kratyuk, Hanumolu, Moon & Mayaram (IEEE TCAS-II 54(3), 2007), power-of-two alpha/beta PI.
 // Proportional-integral loop filter: drives a signed error to zero and outputs the DCO tune code.
 //   tune = clamp(0, (error >>> AlphaShift) + (integral >>> BetaShift), TuneMax),  integral += error
 // with an anti-windup clamp on the integral. The error source is external, so this one filter
-// serves both the linear FLL (error = dco_edge_count - mul, from adpll_freq_detector) and the
+// serves both the FLL (error = dco_edge_count - mul, from adpll_freq_detector) and the
 // phase-domain PLL (error = phase error, from adpll_phase_detector); only the widths/gains differ.
 //
 // Parameters:
@@ -46,7 +46,7 @@
 //   - tune_o         : DCO tune code
 //   - lock_sample_o  : value for the lock detector to watch (the settled tune)
 
-module adpll_loop_filter_pi #(
+module adpll_loop_filter_proportionalintegral #(
     parameter  int unsigned NumTuneBits = 7,
     parameter  int unsigned ErrorWidth  = 26,
     parameter  int unsigned AccWidth    = 19,
