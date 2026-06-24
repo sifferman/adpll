@@ -55,7 +55,7 @@ module ring_dco_binary #(
 wire feedback;
 wire [NumTuneBits:0] node;
 
-adpll_cell_nand2 #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_gate (
+adpll_cell_nand2 #(.Target("gf180mcu_as_sc_mcu7t3v3")) adpll_cell_nand2 (
     .A (enable_i),
     .B (feedback),
     .Y (node[0])
@@ -66,16 +66,16 @@ for (genvar i_GEN = 0; i_GEN < NumTuneBits; i_GEN++) begin : delay_segment
     wire [2*NumStages:0] d;
     assign d[0] = node[i_GEN];
     for (genvar j_GEN = 0; j_GEN < NumStages; j_GEN++) begin : inverter_pair
-        adpll_cell_inv #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_inv_a (
+        adpll_cell_inv #(.Target("gf180mcu_as_sc_mcu7t3v3")) i_inv_a (
             .A (d[2*j_GEN]),
             .Y (d[2*j_GEN + 1])
         );
-        adpll_cell_inv #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_inv_b (
+        adpll_cell_inv #(.Target("gf180mcu_as_sc_mcu7t3v3")) i_inv_b (
             .A (d[2*j_GEN + 1]),
             .Y (d[2*j_GEN + 2])
         );
     end
-    adpll_cell_mux2 #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_sel (
+    adpll_cell_mux2 #(.Target("gf180mcu_as_sc_mcu7t3v3")) adpll_cell_mux2 (
         .A (node[i_GEN]),
         .B (d[2*NumStages]),
         .S (tune_i[i_GEN]),

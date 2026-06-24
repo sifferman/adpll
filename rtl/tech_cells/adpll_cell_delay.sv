@@ -56,7 +56,7 @@ module adpll_cell_delay #(
 
 if (Target == "gf180mcu_as_sc_mcu7t3v3") begin : g_gf180mcu_as_sc_mcu7t3v3
     (* keep *) (* dont_touch = "true" *)
-    gf180mcu_as_sc_mcu7t3v3__dlybuff_2 u_cell (
+    gf180mcu_as_sc_mcu7t3v3__dlybuff_2 gf180mcu_as_sc_mcu7t3v3__dlybuff_2 (
         .A (A),
         .Y (Y)
     );

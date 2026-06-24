@@ -55,7 +55,7 @@ module adpll_cell_nand2 #(
 
 if (Target == "gf180mcu_as_sc_mcu7t3v3") begin : g_gf180mcu_as_sc_mcu7t3v3
     (* keep *) (* dont_touch = "true" *)
-    gf180mcu_as_sc_mcu7t3v3__nand2_2 u_cell (
+    gf180mcu_as_sc_mcu7t3v3__nand2_2 gf180mcu_as_sc_mcu7t3v3__nand2_2 (
         .A (A),
         .B (B),
         .Y (Y)
