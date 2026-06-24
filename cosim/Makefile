@@ -75,6 +75,14 @@ cosim: $(GL_VVP) build/ring.spice ## Run the gate-level cosim to lock (ADPLL=, C
 	 if [ -n "$$t" ]; then echo "$(ADPLL) @ $(CORNER): LOCKED ($$t)"; \
 	 else echo "$(ADPLL) @ $(CORNER): NO-LOCK"; exit 1; fi
 
+# Blackbox stub for the ring so read_slang accepts the wrapper's parameterized ring instantiation
+# (--ignore-unknown-modules alone rejects parameter overrides on an unknown module). Generated, not
+# source. Module name is the config's ring; NumFineBits is declared too (harmless for the rings that
+# don't use it) so the coarse/fine wrapper's override is accepted.
+build/ring_bb.v:
+	mkdir -p $(dir $@)
+	printf '(* blackbox *)\nmodule $(RINGDCO) #(\n  parameter int unsigned NumTuneBits = 7,\n  parameter int unsigned NumFineBits = 3,\n  parameter string Target = "behavioral"\n) (\n  input  wire                   enable_i,\n  input  wire [NumTuneBits-1:0] tune_i,\n  output wire                   clk_o\n);\nendmodule\n' > $@
+
 # Hardened + Magic-extracted ring DCO (transistor netlist with parasitics). Heavy: runs LibreLane.
 build/ring.spice: ../librelane/ring_dco.yaml
 	mkdir -p $(dir $@)
@@ -84,12 +92,8 @@ build/ring.spice: ../librelane/ring_dco.yaml
 # Derive the gate-level loop from the wrapper: black-box the ring, expose dco_clk as a top input, map
 # the loop to gf180 cells, write the netlist. The shrunk -G counters keep the loop small enough to lock
 # in tens of windows within a tractable transient.
-# ring_bb.v is a throwaway blackbox stub: read_slang rejects parameter overrides on an *unknown* module
-# (--ignore-unknown-modules isn't enough), so it needs the ring declared with its params. NumFineBits is
-# included too (harmless for the rings that don't use it) so the coarse/fine wrapper's override is accepted.
-$(GL_V): $(LOOP_RTL)
+$(GL_V): $(LOOP_RTL) build/ring_bb.v
 	mkdir -p $(dir $@)
-	printf '(* blackbox *)\nmodule $(RINGDCO) #(\n  parameter int unsigned NumTuneBits = 7,\n  parameter int unsigned NumFineBits = 3,\n  parameter string Target = "behavioral"\n) (\n  input  wire                   enable_i,\n  input  wire [NumTuneBits-1:0] tune_i,\n  output wire                   clk_o\n);\nendmodule\n' > build/ring_bb.v
 	yosys -m slang -p "read_slang --ignore-unknown-modules -G FreqDetectorMaxEdgesPerWindow=255 -G FreqDetectorMaxWindowSize=15 build/ring_bb.v $(LOOP_RTL); hierarchy -top $(ADPLL); delete t:$(RINGDCO); expose -input w:dco_clk; synth -top $(ADPLL) -flatten; dfflibmap -liberty $(LIB); abc -liberty $(LIB); opt_clean -purge; write_verilog -noattr $@"
 
 # Compile the gate loop + gf180 behavioural cell models into a vvp (timescale stub so vvp time != 1 s).
