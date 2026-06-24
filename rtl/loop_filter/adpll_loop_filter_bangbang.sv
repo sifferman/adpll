@@ -44,14 +44,14 @@ module adpll_loop_filter_bangbang #(
     parameter  int unsigned IntegralGain     = 1,
     parameter  int unsigned ProportionalGain = 1
 ) (
-    input  logic                        clk_i,
-    input  logic                        rst_ni,
-    input  logic                        enable_i,
-    input  logic                        valid_i,
+    input  logic                         clk_i,
+    input  logic                         rst_ni,
+    input  logic                         enable_i,
+    input  logic                         valid_i,
     input  logic signed [ErrorWidth-1:0] error_i,
 
-    output logic[NumTuneBits-1:0]       tune_o,
-    output logic[NumTuneBits-1:0]       lock_sample_o
+    output logic [NumTuneBits-1:0] tune_o,
+    output logic [NumTuneBits-1:0] lock_sample_o
 );
 
 localparam int unsigned TuneMax = (1 << NumTuneBits) - 1;

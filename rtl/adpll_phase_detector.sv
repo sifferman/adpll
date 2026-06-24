@@ -61,7 +61,7 @@ module adpll_phase_detector #(
     input  logic[PhaseWidth-1:0] tdc_phase_i,
 
     output logic signed [ErrorWidth-1:0] error_o,
-    output logic                        valid_o
+    output logic                         valid_o
 );
 
 // Edges per single reference cycle (1-cycle measurement window), accumulated into the DCO phase.

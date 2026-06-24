@@ -30,8 +30,8 @@ async def csr_program_and_status(dut):
 
     # reset (active-high rst); park the status inputs
     dut.rst.value = 1
-    dut.lock.value = 0
-    dut.tune.value = 0
+    dut.lock_i.value = 0
+    dut.tune_i.value = 0
     await ClockCycles(dut.clk, 5)
     dut.rst.value = 0
     await ClockCycles(dut.clk, 2)
@@ -48,26 +48,26 @@ async def csr_program_and_status(dut):
     assert int(await axil.read_dword(POST_DIV)) == 5, "POST_DIV readback mismatch"
 
     # CTRL.enable -> the enable output (and reads back)
-    assert dut.enable.value == 0, "enable asserted before CTRL written"
+    assert dut.enable_o.value == 0, "enable asserted before CTRL written"
     await axil.write_dword(CTRL, 1)
     assert int(await axil.read_dword(CTRL)) & 1 == 1, "CTRL.enable not set"
     await ClockCycles(dut.clk, 1)
-    assert dut.enable.value == 1, "enable output not driven"
-    assert int(dut.ref_mul.value) == 1707, "ref_mul output mismatch"
-    assert int(dut.ref_div.value) == 256, "ref_div output mismatch"
-    assert int(dut.post_div.value) == 5, "post_div output mismatch"
+    assert dut.enable_o.value == 1, "enable output not driven"
+    assert int(dut.ref_mul_o.value) == 1707, "ref_mul output mismatch"
+    assert int(dut.ref_div_o.value) == 256, "ref_div output mismatch"
+    assert int(dut.post_div_o.value) == 5, "post_div output mismatch"
 
     # STATUS reflects the lock / tune status inputs: [0] lock, [NumTuneBits:1] tune
     for tune in (0, 42, (1 << NUM_TUNE) - 1):
-        dut.lock.value = 1
-        dut.tune.value = tune
+        dut.lock_i.value = 1
+        dut.tune_i.value = tune
         await ClockCycles(dut.clk, 2)
         status = int(await axil.read_dword(STATUS))
         assert status & 1 == 1, f"STATUS lock bit low (status={status:#x})"
         assert (status >> 1) & ((1 << NUM_TUNE) - 1) == tune, \
             f"STATUS tune field {(status >> 1) & ((1 << NUM_TUNE) - 1)} != {tune}"
 
-    dut.lock.value = 0
+    dut.lock_i.value = 0
     await ClockCycles(dut.clk, 2)
     assert int(await axil.read_dword(STATUS)) & 1 == 0, "STATUS lock stuck high"
     dut._log.info("PASS: s_axi_adpll_csr program + status readback")

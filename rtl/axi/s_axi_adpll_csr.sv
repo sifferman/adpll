@@ -76,12 +76,12 @@ module s_axi_adpll_csr #(
     output logic                  s_axil_rvalid,
     input  logic                  s_axil_rready,
 
-    output logic                              enable,
-    output logic [EdgeCountWidth-1:0]         ref_mul,
-    output logic [WindowSizeWidth-1:0]        ref_div,
-    output logic [PostDividerDivideWidth-1:0] post_div,
-    input  logic                              lock,
-    input  logic [NumTuneBits-1:0]            tune
+    output logic                              enable_o,
+    output logic [EdgeCountWidth-1:0]         ref_mul_o,
+    output logic [WindowSizeWidth-1:0]        ref_div_o,
+    output logic [PostDividerDivideWidth-1:0] post_div_o,
+    input  logic                              lock_i,
+    input  logic [NumTuneBits-1:0]            tune_i
 );
 
 localparam int unsigned AddrLsb   = $clog2(STRB_WIDTH);   // byte-within-word address bits
@@ -151,7 +151,7 @@ logic [DATA_WIDTH-1:0] rdata_d, rdata_q;
 wire                  read_accept = s_axil_arvalid && (!rvalid_q || s_axil_rready);
 wire [RegIndexW-1:0]  read_index  = s_axil_araddr[AddrLsb +: RegIndexW];
 
-wire [DATA_WIDTH-1:0] status_word = {{(DATA_WIDTH-1-NumTuneBits){1'b0}}, tune, lock};
+wire [DATA_WIDTH-1:0] status_word = {{(DATA_WIDTH-1-NumTuneBits){1'b0}}, tune_i, lock_i};
 
 always_comb begin
     rvalid_d = rvalid_q;
@@ -187,9 +187,9 @@ assign s_axil_rdata   = rdata_q;
 assign s_axil_rvalid  = rvalid_q;
 assign s_axil_rresp   = 2'b00;
 
-assign enable   = ctrl_q;
-assign ref_mul  = ref_mul_q;
-assign ref_div  = ref_div_q;
-assign post_div = post_div_q;
+assign enable_o   = ctrl_q;
+assign ref_mul_o  = ref_mul_q;
+assign ref_div_o  = ref_div_q;
+assign post_div_o = post_div_q;
 
 endmodule

@@ -50,15 +50,15 @@ module adpll_freq_detector #(
     localparam int unsigned WindowSizeWidth   = $clog2(MaxWindowSize + 1),
     localparam int unsigned ErrorWidth        = EdgeCountWidth + 2
 ) (
-    input  logic                      clk_i,
-    input  logic                      rst_ni,
-    input  logic                      enable_i,
-    input  logic[EdgeCountWidth-1:0]  target_i,         // mul (multiply ratio N)
-    input  logic[WindowSizeWidth-1:0] window_length_i,  // div (window length, reference cycles)
-    input  logic                      dco_clk_i,
+    input  logic                       clk_i,
+    input  logic                       rst_ni,
+    input  logic                       enable_i,
+    input  logic [EdgeCountWidth-1:0]  target_i,         // mul (multiply ratio N)
+    input  logic [WindowSizeWidth-1:0] window_length_i,  // div (window length, reference cycles)
+    input  logic                       dco_clk_i,
 
     output logic signed [ErrorWidth-1:0] error_o,
-    output logic                        valid_o
+    output logic                         valid_o
 );
 
 wire [EdgeCountWidth-1:0] dco_edge_count;

@@ -47,10 +47,10 @@
 module adpll_tdc #(
     parameter int unsigned PhaseWidth = 6
 ) (
-    input  logic                 clk_i,
-    input  logic                 rst_ni,
-    input  logic                 dco_clk_i,
-    output logic[PhaseWidth-1:0] phase_o
+    input  logic                  clk_i,
+    input  logic                  rst_ni,
+    input  logic                  dco_clk_i,
+    output logic [PhaseWidth-1:0] phase_o
 );
 
 localparam int unsigned NumTaps = (1 << PhaseWidth) - 1;

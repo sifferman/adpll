@@ -23,6 +23,7 @@ VERILOG_FILES:
 - dir::../rtl/adpll_freq_counter.sv
 - dir::../rtl/adpll_freq_detector.sv
 - dir::../rtl/adpll_lock_detector.sv
+- dir::../rtl/adpll_post_divider.sv
 - dir::../rtl/loop_filter/adpll_loop_filter_bangbang.sv
 - dir::../rtl/loop_filter/adpll_loop_filter_pi.sv
 - dir::../rtl/loop_filter/adpll_loop_filter_gearshift.sv
