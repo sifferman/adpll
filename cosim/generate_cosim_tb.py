@@ -13,7 +13,7 @@
 # The ring's tune_i is LSB-first in its .subckt, so the tune dac maps tune_6..tune_0 -> tia6..tia0 and
 # the ring is wired tia0..tia6.
 #
-#   ./gen_ivlng_deck.py --vvp adpll_bangbang_binary_gl --ring-subckt ring_dco_binary \
+#   ./generate_cosim_tb.py --vvp adpll_bangbang_binary_gl --ring-subckt ring_dco_binary \
 #       --corner typical --ref-mhz 200 --mul 12 --div 8 --post-div 1 > deck.spice
 
 import argparse

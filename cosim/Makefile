@@ -51,7 +51,7 @@ IVLNG_LIBS := $(IVL_PREFIX)/lib:$(call NIXLIB,bzip2-1.0.8):$(call NIXLIB,zlib-1.
 
 GL_V   := $(B)/$(ADPLL)_gl.v
 GL_VVP := $(B)/$(ADPLL)_gl
-DECK   := $(B)/$(ADPLL)_$(CORNER)_ivlng.spice
+DECK   := $(B)/$(ADPLL)_$(CORNER)_cosim_tb.spice
 LOG    := $(B)/$(ADPLL)_$(CORNER).log
 
 .PHONY: cosim clean
@@ -60,7 +60,7 @@ LOG    := $(B)/$(ADPLL)_$(CORNER).log
 # The deck is regenerated every run (it's instant and keyed on MUL/DIV/REF, which aren't in any file
 # name); the slow artifacts (ring.spice, the netlist, the vvp) are file targets and only rebuild on change.
 cosim: $(GL_VVP) $(B)/ring.spice ## Run the gate-level cosim to lock (ADPLL=, CORNER=, MUL=, DIV=)
-	./gen_ivlng_deck.py --vvp $(notdir $(GL_VVP)) --ring-subckt $(RINGDCO) --corner $(CORNER) \
+	./generate_cosim_tb.py --vvp $(notdir $(GL_VVP)) --ring-subckt $(RINGDCO) --corner $(CORNER) \
 	  --ref-mhz $(REF_MHZ) --mul $(MUL) --div $(DIV) --post-div $(POST_DIV) > $(DECK)
 	@echo "== ngspice gate-level cosim ($(ADPLL) @ $(CORNER)) =="
 	cd $(B) && env -u DISPLAY PDK_ROOT=$(PDK_ROOT) \
@@ -95,14 +95,6 @@ $(GL_V): $(LOOP_RTL) $(B)/ring_bb.v | $(B)
 $(GL_VVP): $(GL_V) $(CELLV) | $(B)
 	printf '`timescale 1ns/1ps\n' > $(B)/timescale.v
 	$(IVERILOG) -g2012 -o $@ $(B)/timescale.v $(GL_V) $(CELLV)
-
-# Generate the ngspice deck: ties mul/div/post_div, wires the bridges + ring, MSB-first d_cosim vectors.
-# Run from build/ so the paths the generator reads (ring.spice, the netlist) and the .include it emits
-# all resolve relative to build/, where ngspice itself runs.
-$(DECK): gen_ivlng_deck.py $(GL_V) $(B)/ring.spice
-	cd $(B) && ../gen_ivlng_deck.py --netlist $(notdir $(GL_V)) --module $(ADPLL) --vvp $(notdir $(GL_VVP)) \
-	  --ring ring.spice --ring-subckt $(RINGDCO) --corner $(CORNER) \
-	  --ref-mhz $(REF_MHZ) --mul $(MUL) --div $(DIV) --post-div $(POST_DIV) > $(notdir $(DECK))
 
 clean: ## Remove all build artifacts
 	rm -rf $(B)
