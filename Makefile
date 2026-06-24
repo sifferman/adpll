@@ -5,8 +5,8 @@ SHELL := /bin/bash
 # iverilog defaults to 1 s precision and rounds the behavioural #(1.0ns) delays to zero; set a
 # 1ns/1ps default timescale via an iverilog command file (process substitution -- no source stub).
 TS    = -c <(printf '+timescale+1ns/1ps\n')
-# Shared core + all controllers + all DCOs (single-PLL testbench picks one of each via plusdefines)
-CORE  = $(wildcard rtl/*.sv rtl/controller/*.sv rtl/dco/*.sv)
+# Shared core + all loop filters + all DCOs (single-PLL testbench picks one of each via plusdefines)
+CORE  = $(wildcard rtl/*.sv rtl/loop_filter/*.sv rtl/dco/*.sv)
 NGSPICE ?= ngspice
 
 .PHONY: help sim-adpll sim-adpll-survey sim-adpll-matrix sim-adpll-phase sim-adpll-csr dco-spice clean
@@ -18,17 +18,17 @@ sim-adpll: ## Standalone digital ADPLL: ring DCO (behavioural) + FLL lock (iveri
 	iverilog -g2012 -o sim_build/tb_adpll $(TS) $(CORE) sim/tb_adpll.v
 	vvp sim_build/tb_adpll
 
-sim-adpll-survey: ## Compare the FLL controllers (bang-bang / linear / gearshift): lock time + code
+sim-adpll-survey: ## Compare the FLL loop filters (bang-bang / linear / gearshift): lock time + code
 	@mkdir -p sim_build
 	@for ctrl in "bang-bang:" "linear:-DCTRL_LINEAR" "gearshift:-DCTRL_GEARSHIFT"; do \
-		name=$${ctrl%%:*}; def=$${ctrl#*:}; echo "==== controller: $$name ===="; \
+		name=$${ctrl%%:*}; def=$${ctrl#*:}; echo "==== loop filter: $$name ===="; \
 		iverilog -g2012 $$def -o sim_build/tb_adpll_$$name $(TS) $(CORE) sim/tb_adpll.v && \
 		vvp sim_build/tb_adpll_$$name | grep -E "LOCKED|PASS|FAIL"; \
 	done
 
-sim-adpll-matrix: ## All 12 FLL variants (3 controllers x 4 DCOs): lock time + settled tune
+sim-adpll-matrix: ## All 12 FLL variants (3 loop filters x 4 DCOs): lock time + settled tune
 	@mkdir -p sim_build
-	@printf "%-26s %-12s %-8s %s\n" "config (ctrl x dco)" "lock_cyc" "tune" "result"
+	@printf "%-26s %-12s %-8s %s\n" "config (filter x dco)" "lock_cyc" "tune" "result"
 	@for ctrl in "bb:" "lin:-DCTRL_LINEAR" "gear:-DCTRL_GEARSHIFT"; do \
 		for dco in "binary:" "therm:-DDCO_THERM" "muxtap:-DDCO_MUXTAP" "cfine:-DDCO_COARSEFINE"; do \
 			cn=$${ctrl%%:*}; cd=$${ctrl#*:}; dn=$${dco%%:*}; dd=$${dco#*:}; \
@@ -44,15 +44,15 @@ sim-adpll-matrix: ## All 12 FLL variants (3 controllers x 4 DCOs): lock time + s
 sim-adpll-phase: ## Phase-domain ADPLL (TDC + reference/variable phase accumulators): true phase lock
 	@mkdir -p sim_build
 	iverilog -g2012 -o sim_build/tb_adpll_phase $(TS) \
-		rtl/adpll_freq_counter.sv rtl/adpll_lock_detect.sv rtl/adpll_tdc.sv \
-		rtl/controller/adpll_controller_phase.sv rtl/dco/ring_dco_binary.sv sim/tb_adpll_phase.v
+		rtl/adpll_freq_counter.sv rtl/adpll_lock_detect.sv rtl/adpll_tdc.sv rtl/adpll_phase_detector.sv \
+		rtl/loop_filter/adpll_loop_filter_pi.sv rtl/dco/ring_dco_binary.sv sim/tb_adpll_phase.v
 	vvp sim_build/tb_adpll_phase | grep -E "LOCKED|PASS|FAIL"
 
 sim-adpll-csr: ## Single-PLL CSR: program mul/div/enable over AXI4-Lite, poll STATUS for lock
 	@mkdir -p sim_build
 	iverilog -g2012 -o sim_build/tb_adpll_csr $(TS) \
-		rtl/csr/s_axi_adpll_csr.sv rtl/controller/adpll_controller_bangbang.sv rtl/adpll_freq_counter.sv \
-		rtl/adpll_lock_detect.sv rtl/dco/ring_dco_binary.sv sim/tb_adpll_csr.v
+		rtl/axi/s_axi_adpll_csr.sv rtl/adpll_freq_detector.sv rtl/adpll_freq_counter.sv rtl/adpll_lock_detect.sv \
+		rtl/loop_filter/adpll_loop_filter_bangbang.sv rtl/dco/ring_dco_binary.sv sim/tb_adpll_csr.v
 	vvp sim_build/tb_adpll_csr | grep -E "CSR programmed|LOCKED|PASS|FAIL"
 
 dco-spice: ## DCO freq-vs-code in ngspice. Requires: make dco-spice PDK_ROOT=... PDK=gf180mcuD NGSPICE=...

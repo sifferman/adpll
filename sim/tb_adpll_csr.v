@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Unit test for the integrated ADPLL subsystem: adpll_csr (AXI4-Lite) -> adpll_controller_bangbang
-// (bang-bang PI) -> ring_dco_binary (behavioural). Drives the CSR exactly as the on-chip
-// fabric does -- writes MUL/DIV then sets CTRL.enable -- and polls the STATUS register
-// until the lock bit reads back, mirroring how a host would over Ethernet. Runs under
-// Icarus (SYNTHESIS undefined, behavioural DCO). PASSes on lock with an in-range tune.
+// Unit test for the integrated ADPLL subsystem: s_axi_adpll_csr (AXI4-Lite) drives the assembled
+// FLL chain -- adpll_freq_detector (mul/div) -> adpll_loop_filter_bangbang -> adpll_lock_detect --
+// closed on ring_dco_binary (behavioural). Drives the CSR exactly as the on-chip fabric does --
+// writes MUL/DIV then sets CTRL.enable -- and polls the STATUS register until the lock bit reads
+// back, mirroring how a host would over Ethernet. Runs under Icarus (SYNTHESIS undefined,
+// behavioural DCO). PASSes on lock with an in-range tune.
 
 
 module tb_adpll_csr;
@@ -44,10 +45,26 @@ module tb_adpll_csr;
       .enable(enable), .mul(mul), .div(div), .lock(lock), .tune(tune)
   );
 
-  adpll_controller_bangbang #(.NumTuneBits(NUM_TUNE)) u_ctrl (
+  localparam int unsigned ERR_W = CNT_W + 2;   // adpll_freq_detector.ErrorWidth
+  wire signed [ERR_W-1:0] error;
+  wire                    valid;
+  wire [NUM_TUNE-1:0]     lock_sample;
+
+  adpll_freq_detector #(.MaxEdgesPerWindow((1<<CNT_W)-1), .MaxWindowSize((1<<DIV_W)-1)) u_det (
       .clk_i(clk), .rst_ni(rst_n), .enable_i(enable),
-      .mul_i(mul), .div_i(div), .dco_clk_i(dco_clk),
-      .tune_o(tune), .lock_o(lock)
+      .target_i(mul), .window_length_i(div), .dco_clk_i(dco_clk),
+      .error_o(error), .valid_o(valid)
+  );
+
+  adpll_loop_filter_bangbang #(.NumTuneBits(NUM_TUNE), .ErrorWidth(ERR_W)) u_lf (
+      .clk_i(clk), .rst_ni(rst_n), .enable_i(enable),
+      .valid_i(valid), .error_i(error),
+      .tune_o(tune), .lock_sample_o(lock_sample)
+  );
+
+  adpll_lock_detect #(.SampleWidth(NUM_TUNE), .MinSamplesForLock(8), .BandRadius(1)) u_ld (
+      .clk_i(clk), .rst_ni(rst_n), .enable_i(enable),
+      .sample_valid_i(valid), .tuning_sample_i(lock_sample), .lock_o(lock)
   );
 
   ring_dco_binary #(.NumTuneBits(NUM_TUNE)) u_dco (.enable_i(enable), .tune_i(tune), .clk_o(dco_clk));

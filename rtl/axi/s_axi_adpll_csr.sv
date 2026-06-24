@@ -76,11 +76,11 @@ module s_axi_adpll_csr #(
     output wire                   s_axil_rvalid,
     input  wire                   s_axil_rready,
 
-    output wire                   enable,
+    output wire                       enable,
     output wire [EdgeCountWidth-1:0]  mul,
     output wire [WindowSizeWidth-1:0] div,
-    input  wire                   lock,
-    input  wire [NumTuneBits-1:0] tune
+    input  wire                       lock,
+    input  wire [NumTuneBits-1:0]     tune
 );
 
 localparam int unsigned AddrLsb = $clog2(STRB_WIDTH);   // byte-within-word address bits

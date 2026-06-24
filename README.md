@@ -27,34 +27,45 @@ headers and in [`docs/adpll_survey.md`](docs/adpll_survey.md).
 
 ## What's here
 
-- **Front end** — `adpll_freq_counter` (Gray-CDC DCO-edge counter over a runtime window) and
-  `adpll_tdc` (sub-cycle phase, for the phase-domain loop); `adpll_lock_detect`.
-- **Controllers** (`rtl/controller/`) — three frequency-locked loop filters: `bangbang`
-  (1-bit sign), `linear` (multi-bit PI, power-of-two α/β), `gearshift` (adaptive-step binary
-  search); plus `phase`, a true phase-locked type-II PI using the TDC.
+A PLL is assembled from three swappable stages — **detector → loop filter → DCO** — plus a lock
+detector. There is no monolithic "controller": the instantiating project wires the three blocks it
+wants directly (see `sim/tb_adpll.v`).
+
+- **Detectors** — `adpll_freq_detector` (frequency error: DCO-edge count over a runtime window vs a
+  target) and `adpll_phase_detector` (phase error: reference/variable phase accumulators + the
+  `adpll_tdc` sub-cycle fraction). Both build on the shared `adpll_freq_counter` (Gray-CDC edge
+  counter); `adpll_lock_detect` watches the settled tune code.
+- **Loop filters** (`rtl/loop_filter/`) — `bangbang` (1-bit sign), `pi` (multi-bit linear PI,
+  power-of-two α/β, anti-windup), `gearshift` (adaptive-step binary search). The error source is
+  external, so the *same* `pi` filter closes both the linear FLL (behind `adpll_freq_detector`)
+  and the type-II phase loop (behind `adpll_phase_detector`) — only the widths/gains differ.
 - **DCOs** (`rtl/dco/`) — `binary`, `thermometer`, `muxtap`, `coarsefine` ring oscillators.
-- **CSR** (`rtl/csr/`) — `s_axi_adpll_csr`, a single-PLL AXI4-Lite control/status block (enable/mul/div
+- **CSR** (`rtl/axi/`) — `s_axi_adpll_csr`, a single-PLL AXI4-Lite control/status block (enable/mul/div
   + lock/tune) showing how to drive one PLL over a bus.
 
-Picking specific frozen controller×DCO configurations ("macros") and arraying many PLLs behind one
-bus is integration left to the instantiating project (e.g. gf180mcu-peripherals builds a 12-PLL
+Picking specific frozen detector×filter×DCO configurations ("macros") and arraying many PLLs behind
+one bus is integration left to the instantiating project (e.g. gf180mcu-peripherals builds a 12-PLL
 array from these blocks) — this repo ships the reusable parameterizable parts.
 
 ## Layout
 
 ```
-rtl/      adpll_freq_counter, adpll_lock_detect, adpll_tdc, controller/, dco/, csr/
-sim/      self-contained Icarus testbenches (+ _sim_timescale.v)
-scripts/  gen_ring_dco_spice.py (SPICE characterization), characterize_pll.py, plot_pll.py
-docs/     adpll_survey.md (the variant survey, citations, results) + figures
+rtl/             adpll_freq_counter, adpll_freq_detector, adpll_phase_detector,
+                 adpll_lock_detect, adpll_tdc, adpll_delay_cell
+rtl/loop_filter  bangbang / pi / gearshift loop filters
+rtl/dco          binary / thermometer / muxtap / coarsefine ring DCOs
+rtl/axi          s_axi_adpll_csr (AXI4-Lite control/status)
+sim/             self-contained Icarus testbenches
+scripts/         gen_ring_dco_spice.py (SPICE characterization), characterize_pll.py, plot_pll.py
+docs/            adpll_survey.md (the variant survey, citations, results) + figures
 ```
 
 ## Verify (Icarus, no PDK)
 
 ```sh
 make sim-adpll          # ring DCO oscillates + the loop locks
-make sim-adpll-survey   # compare the FLL controllers (bang-bang / linear / gearshift)
-make sim-adpll-matrix   # all 12 FLL variants (3 controllers x 4 DCOs)
+make sim-adpll-survey   # compare the FLL loop filters (bang-bang / linear / gearshift)
+make sim-adpll-matrix   # all 12 FLL variants (3 loop filters x 4 DCOs)
 make sim-adpll-phase    # phase-domain ADPLL (TDC): true phase lock
 make sim-adpll-csr      # single-PLL CSR over AXI4-Lite
 ```
@@ -67,9 +78,9 @@ make dco-spice PDK_ROOT=/path/to/pdks PDK=gf180mcuD NGSPICE=/path/to/ngspice TOP
 
 ## Portability
 
-Everything except the DCO rings and the TDC is PDK-agnostic. Those instantiate five gf180
-primitives (`inv`/`nand2`/`mux2` in the rings; `dlybuff`/`dfxtp` in the TDC). To retarget,
-re-implement those cells for your PDK and keep the ring's combinational loop out of optimization
+Everything except the DCO rings and the TDC delay line is PDK-agnostic. Those instantiate gf180
+primitives (`inv`/`nand2`/`mux2` in the rings; `adpll_delay_cell`, a `dlybuff` wrapper, in the
+TDC). To retarget, re-implement those cells for your PDK and keep the ring's combinational loop out of optimization
 (`keep`/`dont_touch`) and out of the clock-tree/STA (leave the DCO clock undefined in SDC). The
 absolute frequency is set by the silicon, not RTL — the closed loop tunes to whatever ratio is
 reachable, so there is no "delay" parameter to set.

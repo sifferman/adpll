@@ -1,19 +1,24 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Testbench for the phase-domain ADPLL (ring DCO + TDC + phase-locked controller). Runs under
-// Icarus (SYNTHESIS undefined) so the DCO and TDC compile their behavioural models. Unlike the
-// frequency-locked tb_adpll, this loop nulls PHASE: the controller advances a reference phase by
-// fcw_i each reference cycle and the variable phase by the DCO edge count plus the TDC fraction.
+// Testbench for the phase-domain ADPLL, assembled here (no "controller" wrapper) from:
+//   ring DCO -> adpll_tdc (sub-cycle phase) -> adpll_phase_detector (phase error)
+//            -> adpll_loop_filter_pi (PI) -> adpll_lock_detect.
+// Runs under Icarus (SYNTHESIS undefined) so the DCO and TDC compile their behavioural models.
+// Unlike the frequency-locked tb_adpll, this loop nulls PHASE: the detector advances a reference
+// phase by fcw_i each reference cycle and the variable phase by the DCO edge count plus the TDC
+// fraction; the PI loop filter drives that phase error to zero. The same adpll_loop_filter_pi
+// serves here and in the linear FLL -- only the error source (detector) and gains differ.
 //
 // 25 MHz reference (40 ns). With the behavioural DCO (half-period 1.0+0.1*tune ns), tune~=20 gives
-// a 6 ns DCO period, so F_DCO/F_ref = 40/6 = 6.667; in Q.FracBits (FracBits=6) that is fcw = 427.
+// a 6 ns DCO period, so F_DCO/F_ref = 40/6 = 6.667; in Q.PhaseWidth (PhaseWidth=6) that is fcw=427.
 // Reports time-to-lock and the settled tune, PASSing on a sane mid-range code.
 
 module tb_adpll_phase;
   localparam int unsigned NUM_TUNE = 7;
-  localparam int unsigned FRAC     = 6;
+  localparam int unsigned PHASE_W  = 6;     // TDC fractional-phase resolution (adpll_tdc.PhaseWidth)
   localparam int unsigned FCW_W    = 24;
-  localparam int unsigned FCW      = 427;   // 6.667 * 2^FRAC  (targets tune ~= 20)
+  localparam int unsigned ERR_W    = 24;    // phase-error / accumulator width
+  localparam int unsigned FCW      = 427;   // 6.667 * 2^PHASE_W  (targets tune ~= 20)
 
   reg clk = 1'b0;
   always #(20ns) clk = ~clk;          // 25 MHz reference (40 ns)
@@ -21,10 +26,13 @@ module tb_adpll_phase;
   reg rst_n  = 1'b1;
   reg enable = 1'b0;
 
-  wire [NUM_TUNE-1:0] tune;
-  wire                lock;
-  wire                dco_clk;
-  wire [FRAC-1:0]     tdc_frac;
+  wire [NUM_TUNE-1:0]     tune;
+  wire [NUM_TUNE-1:0]     lock_sample;
+  wire                    lock;
+  wire                    dco_clk;
+  wire [PHASE_W-1:0]      tdc_phase;
+  wire signed [ERR_W-1:0] error;
+  wire                    valid;
 
   ring_dco_binary #(.NumTuneBits(NUM_TUNE)) u_dco (
       .enable_i(enable),
@@ -32,26 +40,48 @@ module tb_adpll_phase;
       .clk_o   (dco_clk)
   );
 
-  adpll_tdc #(.PhaseWidth(FRAC)) u_tdc (
+  adpll_tdc #(.PhaseWidth(PHASE_W)) u_tdc (
       .clk_i    (clk),
       .rst_ni   (rst_n),
       .dco_clk_i(dco_clk),
-      .phase_o  (tdc_frac)
+      .phase_o  (tdc_phase)
   );
 
-  adpll_controller_phase #(
+  adpll_phase_detector #(.FcwWidth(FCW_W), .PhaseWidth(PHASE_W), .ErrorWidth(ERR_W)) u_det (
+      .clk_i      (clk),
+      .rst_ni     (rst_n),
+      .enable_i   (enable),
+      .fcw_i      (FCW_W'(FCW)),
+      .dco_clk_i  (dco_clk),
+      .tdc_phase_i(tdc_phase),
+      .error_o    (error),
+      .valid_o    (valid)
+  );
+
+  // Type-II PI: gentler gains than the FLL (Alpha=6/Beta=11), accumulator sized to the phase error.
+  adpll_loop_filter_pi #(
       .NumTuneBits(NUM_TUNE),
-      .FracBits   (FRAC),
-      .FcwWidth   (FCW_W)
-  ) u_ctrl (
-      .clk_i     (clk),
-      .rst_ni    (rst_n),
-      .enable_i  (enable),
-      .fcw_i     (FCW_W'(FCW)),
-      .dco_clk_i (dco_clk),
-      .tdc_frac_i(tdc_frac),
-      .tune_o    (tune),
-      .lock_o    (lock)
+      .ErrorWidth (ERR_W),
+      .AccWidth   (ERR_W),
+      .AlphaShift (6),
+      .BetaShift  (11)
+  ) u_lf (
+      .clk_i        (clk),
+      .rst_ni       (rst_n),
+      .enable_i     (enable),
+      .valid_i      (valid),
+      .error_i      (error),
+      .tune_o       (tune),
+      .lock_sample_o(lock_sample)
+  );
+
+  adpll_lock_detect #(.SampleWidth(NUM_TUNE), .MinSamplesForLock(8), .BandRadius(2)) u_ld (
+      .clk_i          (clk),
+      .rst_ni         (rst_n),
+      .enable_i       (enable),
+      .sample_valid_i (valid),
+      .tuning_sample_i(lock_sample),
+      .lock_o         (lock)
   );
 
   integer cycles = 0, enable_cycle = 0;

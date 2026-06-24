@@ -28,14 +28,17 @@ A programmable-ratio frequency synthesizer, the canonical ADPLL pipeline
 ([Kratyuk2007] Fig. 2 / [Hanumolu2007] Fig. 4):
 
 ```
-            +-------------------+   +-----------+   +-----+
-  F_clk_i ->| adpll_freq_counter   |-->| loop      |-->| ring|--> clk_o (F_DCO)
-            | (edge count over  |   | filter    |   | DCO |--+
-            |  div_i cycles)    |   |(adpll_controller_bangbang|   +-----+  |
-            +-------------------+   | _*)       |            |
-                    ^               +-----------+            |
-                    +----------- DCO edges (Gray-CDC) -------+
+            +---------------------+   +--------------+   +------+
+  F_clk_i ->| adpll_freq_detector |-->| loop filter  |-->| ring |--> clk_o (F_DCO)
+            | (edge count over    |   | (bangbang /  |   | DCO  |--+
+            |  div_i cycles - mul)|   |  pi / gearsh)|   +------+  |
+            +---------------------+   +--------------+             |
+                    ^                                              |
+                    +------------- DCO edges (Gray-CDC) -----------+
 ```
+
+There is no monolithic "controller": a PLL is three swappable stages wired directly —
+**detector** (what error) → **loop filter** (how to correct) → **DCO** — plus `adpll_lock_detect`.
 
 At lock `measured == mul`, so **F_DCO = (mul / div) · F_clk_i**: `mul` is the
 feedback-multiply ratio N and `div` is the reference divider M. Both are **runtime inputs**
@@ -49,9 +52,9 @@ temperature (PVT) variations."* A second-order (type-II) loop suffices: [Kratyuk
 
 | module | role |
 |---|---|
-| `adpll_freq_counter` | Gray-coded DCO-edge counter over a runtime-length measurement window; frequency-to-digital front end. Shared by all controllers. |
+| `adpll_freq_counter` | Gray-coded DCO-edge counter over a runtime-length measurement window; frequency-to-digital primitive. Shared by both detectors. |
 | `adpll_lock_detect` | declares lock when the watched control code holds within ±`BandRadius` for `MinSamplesForLock` consecutive samples. Shared. |
-| `adpll_tdc` | time-to-digital converter: sub-cycle DCO phase at the reference edge (flash `dlybuff` delay line in synthesis / behavioural `$realtime` model in sim). Used only by the phase-domain controller. |
+| `adpll_tdc` | time-to-digital converter: sub-cycle DCO phase at the reference edge (flash delay line of `adpll_delay_cell`s in synthesis / behavioural `$realtime` model in sim). Used only by `adpll_phase_detector`. |
 
 ## DCO variants (interface `enable_i`, `tune_i[NumTuneBits-1:0]`, `clk_o`)
 
@@ -72,38 +75,46 @@ current DAC.
 | `ring_dco_muxtap` | variable ring **length** via a 2^N:1 tap mux tree (Kajiwara–Nakagawa style) | re-routes feedback instead of inserting delay; fixed mux-tree delay floor |
 | `ring_dco_coarsefine` | two banks: a thermometer **coarse** bank (unit = 2^FineBits pairs) + a thermometer **fine** bank (unit = 1 pair) — Staszewski normalized DCO [Staszewski2006 §5] | wide range + fine resolution from few units; coarse/fine mismatch is the DNL term to watch |
 
-## Controller variants
+## Detector variants (what error)
 
-The first three are **frequency-locked** loops sharing one interface
-(`clk_i,rst_ni,enable_i,mul_i,div_i,dco_clk_i → tune_o,lock_o`); they reuse `adpll_freq_counter`
-+ `adpll_lock_detect` and differ only in the loop filter. The fourth is a true **phase-locked**
-loop with a different front end (a TDC + phase accumulators). All are proportional-integral (PI):
+Two front ends produce a signed loop error from the DCO feedback; both build on
+`adpll_freq_counter`, and both feed any loop filter below (generic `error_i → tune_o`).
+
+| module | loop | error | source |
+|---|---|---|---|
+| `adpll_freq_detector` | FLL | `dco_edge_count − mul` over a `div`-cycle window (interface `mul_i/div_i`) | counter-based frequency detector, [Kratyuk2007 Fig. 2] |
+| `adpll_phase_detector` | PLL | accumulated phase error: reference phase (`+= fcw_i`) − variable phase (DCO edges + `adpll_tdc` fraction); interface `fcw_i/tdc_phase_i` | phase-domain ADPLL [Staszewski2006 §4–5] — nulls *phase*, not just average frequency |
+
+## Loop-filter variants (how to correct)
+
+Each maps the signed error to a DCO tune code; all are proportional-integral (PI):
 [Kratyuk2007 §IV-C] *"A digital equivalent of an analog loop filter consists of a proportional
-path with a gain α and an integral path with a gain β."*
+path with a gain α and an integral path with a gain β."* Because the error source is external, the
+**same `pi` filter** closes both the linear FLL (behind `adpll_freq_detector`) and the type-II
+phase loop (behind `adpll_phase_detector`) — only the widths/gains differ.
 
-| module | loop / filter | source |
+| module | filter | source |
 |---|---|---|
-| `adpll_controller_bangbang` | FLL, **bang-bang** PI: 1-bit (sign) error, integer gains | [Hanumolu2007 §IV-A] *"A DFF simply detects the sign of the phase error and hence serves as a 1-bit TDC"*; bang-bang dynamics [DaDalt2004] |
-| `adpll_controller_linear` | FLL, **linear** PI: multi-bit error, power-of-two α/β shifts, anti-windup | full [Kratyuk2007] procedure; gains quantized to powers of two ([Kratyuk2007 §V] *"α ≈ 2⁻³, β ≈ 2⁻⁷"*) |
-| `adpll_controller_gearshift` | FLL, **adaptive-step** bang-bang: step `1<<gear`, downshift a gear on each error-sign reversal | gear shifting [DaDalt2005 §V]; a coarse binary search that auto-refines to a ±1 LSB limit cycle (fast lock, no Kp/Ki tuning) |
-| `adpll_controller_phase` | **PLL**, type-II PI on the phase error (reference/variable phase accumulators + `adpll_tdc`); interface uses `fcw_i,tdc_frac_i` instead of `mul_i/div_i` | phase-domain ADPLL [Staszewski2006 §4–5]; type-II PI [Kratyuk2007] — nulls *phase*, not just average frequency |
+| `adpll_loop_filter_bangbang` | **bang-bang** PI: 1-bit (sign) error, integer gains | [Hanumolu2007 §IV-A] *"A DFF simply detects the sign of the phase error and hence serves as a 1-bit TDC"*; bang-bang dynamics [DaDalt2004] |
+| `adpll_loop_filter_pi` | **linear** PI: multi-bit error, power-of-two α/β shifts, anti-windup (also closes the phase loop) | full [Kratyuk2007] procedure; gains quantized to powers of two ([Kratyuk2007 §V] *"α ≈ 2⁻³, β ≈ 2⁻⁷"*) |
+| `adpll_loop_filter_gearshift` | **adaptive-step** bang-bang: step `1<<gear`, downshift a gear on each error-sign reversal | gear shifting [DaDalt2005 §V]; a coarse binary search that auto-refines to a ±1 LSB limit cycle (fast lock, no Kp/Ki tuning) |
 
 ## Results
 
-### Controller comparison — `make sim-adpll-survey` (behavioural DCO, mul=1707, div=256, target tune≈20)
+### Loop-filter comparison — `make sim-adpll-survey` (behavioural DCO, mul=1707, div=256, target tune≈20)
 
-| controller | settled tune | lock time (ref cycles) | notes |
+| loop filter | settled tune | lock time (ref cycles) | notes |
 |---|---|---|---|
 | bang-bang PI | 21 | 7938 | no gain matching; clean ±1 LSB limit cycle |
 | linear PI | 20 | 4610 | faster + exact, **but** required a tiny proportional gain (`AlphaShift=10`) — a larger α slams tune to a rail and oscillates rail-to-rail on a coarse DCO (huge cold-start error) |
 | gear-shift | 20 | 4610 | binary-search acquisition (step halves on each sign reversal); as fast as linear PI with **no** Kp/Ki tuning |
 
-All three FLL controllers pass against all four DCOs — `make sim-adpll-matrix` (3 × 4 = 12 variants,
+All three FLL loop filters pass against all four DCOs — `make sim-adpll-matrix` (3 × 4 = 12 variants,
 bang-bang settles tune 21, linear/gearshift tune 20). The phase-domain PLL is measured separately
 (`make sim-adpll-phase`, fcw=427=6.667·2⁶, AlphaShift=6/BetaShift=11): it **phase**-locks tune≈21 in
 **42 ref-cycles** and holds steady-state tune in [18,22] about the ideal 20.
 
-![Controller acquisition trajectory](figures/ctrl_trajectory.png)
+![Loop-filter acquisition trajectory](figures/ctrl_trajectory.png)
 
 The acquisition trajectory (above, `-DTRACE`) makes the difference visual: the bang-bang loop
 steps ±1 LSB/window — a slow staircase that then hunts in a ±1 LSB limit cycle around the
@@ -148,7 +159,7 @@ Findings (confirming the textbook):
    ring sustains multiple circulating waves. Usable monotonic range is codes 0–24.
 
 Corner sims are run regularly via `make dco-spice-corners` as the design evolves; the figures
-are regenerated with `src/adpll/dco/plot_pll.py`.
+are regenerated with `scripts/plot_pll.py`.
 
 ### Coarse/fine DCO in SPICE — `gen_ring_dco_spice.py --topology coarsefine`
 
@@ -169,7 +180,7 @@ The extraction is slower per code than the single-bank rings (the coarse bank in
 
 ## On-chip: the 12-PLL array
 
-All 12 FLL macros (3 controllers × 4 DCOs) ship in `chip_core` as `adpll_array`, each wired to
+All 12 FLL macros (3 loop filters × 4 DCOs) ship in `chip_core` as `adpll_array`, each wired to
 `adpll_array_csr` (AXI4-Lite at `0x2000_0000`): a host programs every PLL independently over
 Ethernet (PLL `i` = four words at byte offset `i*0x10`: `CTRL`/`MUL`/`DIV`/`STATUS`) and a global
 `OBS_SEL` (`0xC0`) picks which PLL's clock+lock drive the observation mux. The 12 PLLs add **zero

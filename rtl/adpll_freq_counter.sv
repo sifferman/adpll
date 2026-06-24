@@ -31,7 +31,7 @@
 // The ADPLL's frequency sensor. The loop must drive F_DCO = (mul/div) * F_clk_i but cannot read
 // an analog frequency directly, so it counts DCO rising edges over a window of window_length_i
 // reference cycles: that count IS (F_DCO/F_clk_i) * window_length_i, the digital frequency the
-// controller compares against its target. Instantiated once inside each adpll_controller_*. The
+// detector compares against its target. Instantiated once inside each adpll_*_detector. The
 // DCO-edge count crosses into clk_i Gray-coded through a two-flop synchronizer.
 //
 // Parameters:
