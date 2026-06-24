@@ -8,8 +8,8 @@ This is the chip's real analog/digital boundary. The ngspice side stays small �
 
 1. **Make `.spice` + `.v`.** LibreLane hardens the ring DCO and Magic extracts it → `ring.spice`
    (transistors + parasitics). yosys derives the loop from the `adpll_<filter>_<dco>` wrapper →
-   `<cfg>_gl.v`. The ring is black-boxed. Its `clk_o` becomes a top input `dco_clk`. The rest maps to
-   gf180 cells. Icarus compiles `<cfg>_gl.v` + the PDK cell models to a `vvp`.
+   `synth.v`. The ring is black-boxed. Its `clk_o` becomes a top input `dco_clk`. The rest maps to
+   gf180 cells. Icarus compiles `synth.v` + the PDK cell models to `synth.vvp`.
 2. **Make the testbench.** `generate_cosim_tb.py` emits `<cfg>_<corner>_cosim_tb.spice`. It `.include`s
    `ring.spice`. It instantiates the loop as a `d_cosim` device. It ties `ref_mul_i`/`ref_div_i`/
    `post_div_i` to rails (from `--mul/--div/--post-div`). It bridges the two domains with
