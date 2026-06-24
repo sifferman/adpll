@@ -1,0 +1,58 @@
+# LibreLane Classic-flow config to harden ONE ring_dco_<variant> as a tiny standalone macro,
+# purely to extract a layout SPICE netlist for DCO frequency-vs-code characterisation.
+#
+# This replaces the old hand-written netlist generator: the SPICE comes from the .sv via the real
+# digital flow (synth -> place -> route -> Magic extraction), so it is the single source of truth
+# and (with RCX) parasitic-accurate. Run it through the project's nix env, e.g.:
+#
+#   nix develop -c librelane third_party/adpll/librelane/ring_dco.yaml \
+#       --pdk gf180mcuD --pdk-root <root> --scl gf180mcu_as_sc_mcu7t3v3 \
+#       --override DESIGN_NAME=ring_dco_binary
+#
+# The ring is a free-running oscillator with a combinational feedback loop and NO clock, so CTS and
+# timing-driven steps are disabled; the cells carry (* keep *)/(* dont_touch *) and the module
+# (* keep_hierarchy *), so the ring survives synthesis and resizing intact.
+
+meta:
+  version: 2
+  flow: Classic
+
+# Overridden per variant on the CLI (binary | thermometer | muxtap | coarsefine).
+DESIGN_NAME: ring_dco_binary
+
+VERILOG_FILES:
+- dir::../rtl/tech_cells/adpll_cell_nand2.sv
+- dir::../rtl/tech_cells/adpll_cell_inv.sv
+- dir::../rtl/tech_cells/adpll_cell_mux2.sv
+- dir::../rtl/dco/ring_dco_binary.sv
+- dir::../rtl/dco/ring_dco_thermometer.sv
+- dir::../rtl/dco/ring_dco_muxtap.sv
+- dir::../rtl/dco/ring_dco_coarsefine.sv
+
+# slang elaborates the tech-cell string parameter; set Target to the gf180 3.3 V library.
+USE_SLANG: true
+# NOTE: the -G value must be a SystemVerilog string LITERAL (quoted) -- a bare word is parsed as an
+# undeclared identifier.
+SLANG_ARGUMENTS: ['--ignore-unknown-modules', '-G', 'Target="gf180mcu_as_sc_mcu7t3v3"']
+
+# No clock: it is a ring oscillator. Disable clock-tree synthesis and timing-driven optimisation,
+# and break the combinational loop for STA so the flow doesn't error on it.
+CLOCK_PORT: null
+CLOCK_PERIOD: 10
+RUN_CTS: false
+RUN_POST_GRT_RESIZER_TIMING: false
+DESIGN_REPAIR_BUFFER_INPUT_PORTS: false
+
+# Tiny fixed floorplan -- a handful of cells.
+FP_SIZING: absolute
+DIE_AREA: [0, 0, 80, 80]
+CORE_AREA: [5, 5, 75, 75]
+PL_TARGET_DENSITY_PCT: 40
+
+# The ring is kept intact by the RTL attributes: (* keep_hierarchy *) on the module and
+# (* keep *)/(* dont_touch *) on the gf180 cells in rtl/tech_cells/.
+
+# Magic-based SPICE extraction (the netlist we feed to ngspice). Parasitic R/C if the PDK supports
+# RCX; otherwise device-level.
+MAGIC_EXT_USE_GDS: true
+RUN_MAGIC_STREAMOUT: true

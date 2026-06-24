@@ -3,3 +3,5 @@ sim_build/
 *.vcd
 __pycache__/
 *.pyc
+# LibreLane harden/extraction run artifacts (DCO SPICE characterization)
+librelane/runs/
