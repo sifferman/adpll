@@ -51,24 +51,30 @@ IVLNG_LIBS := $(IVL_PREFIX)/lib:$(call NIXLIB,bzip2-1.0.8):$(call NIXLIB,zlib-1.
 
 GL_V   := $(B)/$(ADPLL)_gl.v
 GL_VVP := $(B)/$(ADPLL)_gl
-DECK   := $(B)/$(ADPLL)_$(CORNER)_cosim_tb.spice
+TB     := $(B)/$(ADPLL)_$(CORNER)_cosim_tb.spice
 LOG    := $(B)/$(ADPLL)_$(CORNER).log
 
 .PHONY: cosim clean
 .DELETE_ON_ERROR:
 
-# The deck is regenerated every run (it's instant and keyed on MUL/DIV/REF, which aren't in any file
+# The testbench is regenerated every run (it's instant and keyed on MUL/DIV/REF, which aren't in any file
 # name); the slow artifacts (ring.spice, the netlist, the vvp) are file targets and only rebuild on change.
 cosim: $(GL_VVP) $(B)/ring.spice ## Run the gate-level cosim to lock (ADPLL=, CORNER=, MUL=, DIV=)
-	./generate_cosim_tb.py --vvp $(notdir $(GL_VVP)) --ring-subckt $(RINGDCO) --corner $(CORNER) \
-	  --ref-mhz $(REF_MHZ) --mul $(MUL) --div $(DIV) --post-div $(POST_DIV) > $(DECK)
+	./generate_cosim_tb.py \
+	 --vvp $(notdir $(GL_VVP)) \
+	 --ring-subckt $(RINGDCO) \
+	 --corner $(CORNER) \
+	 --ref-mhz $(REF_MHZ) \
+	 --mul $(MUL) \
+	 --div $(DIV) \
+	 --post-div $(POST_DIV) > $(TB)
 	@echo "== ngspice gate-level cosim ($(ADPLL) @ $(CORNER)) =="
 	cd $(B) && env -u DISPLAY PDK_ROOT=$(PDK_ROOT) \
-	  LD_LIBRARY_PATH="$$LD_LIBRARY_PATH:$(IVLNG_LIBS)" PATH="$(IVL_PREFIX)/bin:$$PATH" \
-	  ngspice -b $(notdir $(DECK)) 2>&1 | tee $(notdir $(LOG)) | grep -aiE "t_lock|error|aborted" || true
+	 LD_LIBRARY_PATH="$$LD_LIBRARY_PATH:$(IVLNG_LIBS)" PATH="$(IVL_PREFIX)/bin:$$PATH" \
+	 ngspice -b $(notdir $(TB)) 2>&1 | tee $(notdir $(LOG)) | grep -aiE "t_lock|error|aborted" || true
 	@t=$$(grep -aoE "t_lock *= *[0-9.eE+-]+" $(LOG) | head -1); \
-	  if [ -n "$$t" ]; then echo "$(ADPLL) @ $(CORNER): LOCKED ($$t)"; \
-	  else echo "$(ADPLL) @ $(CORNER): NO-LOCK"; exit 1; fi
+	 if [ -n "$$t" ]; then echo "$(ADPLL) @ $(CORNER): LOCKED ($$t)"; \
+	 else echo "$(ADPLL) @ $(CORNER): NO-LOCK"; exit 1; fi
 
 $(B):
 	mkdir -p $(B)

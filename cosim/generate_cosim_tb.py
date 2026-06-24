@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Emit the ngspice deck for the GATE-LEVEL adpll cosim: analog ring DCO (ngspice, extracted) + the
+# Emit the ngspice testbench for the GATE-LEVEL adpll cosim: analog ring DCO (ngspice, extracted) + the
 # synthesized gf180 loop run in Icarus Verilog through ngspice's d_cosim (the `ivlng` shim).
 #
 # The synthesized loop's port interface is FIXED -- all 12 adpll_<filter>_<dco> wrappers share it, and
@@ -14,11 +14,11 @@
 # the ring is wired tia0..tia6.
 #
 #   ./generate_cosim_tb.py --vvp adpll_bangbang_binary_gl --ring-subckt ring_dco_binary \
-#       --corner typical --ref-mhz 200 --mul 12 --div 8 --post-div 1 > deck.spice
+#       --corner typical --ref-mhz 200 --mul 12 --div 8 --post-div 1 > cosim_tb.spice
 
 import argparse
 
-DECK_TEMPLATE = """\
+TB_TEMPLATE = """\
 * GATE-LEVEL ivlng cosim: ring DCO (ngspice) + synthesized gf180 loop (Icarus via d_cosim)
 * ref={ref_mhz}MHz mul={mul} div={div} post_div={post_div} -> target F_DCO={target:.0f}MHz
 * ngspice expands $PDK_ROOT in the .lib/.include FILE paths; the corner is a literal section name.
@@ -83,7 +83,7 @@ def main():
     ins = ["clk_d", "rst_d", "en_d"] + rails(a.mul, 8) + rails(a.div, 4) + rails(a.post_div, 8) + ["dco_d"]
     outs = ["clk_o", "lock_o"] + [f"tune_{i}" for i in range(6, -1, -1)] + ["debug_dco_clk_o"]
     tper = 1000.0 / a.ref_mhz
-    print(DECK_TEMPLATE.format(
+    print(TB_TEMPLATE.format(
         ref_mhz=a.ref_mhz, mul=a.mul, div=a.div, post_div=a.post_div,
         target=a.mul / a.div * a.ref_mhz, corner=a.corner, vvp=a.vvp, vdd=a.vdd,
         ins=" ".join(ins), outs=" ".join(outs), ring_subckt=a.ring_subckt,
