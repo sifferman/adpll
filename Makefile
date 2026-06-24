@@ -6,12 +6,12 @@ SHELL := /bin/bash
 # iverilog defaults to 1 s precision and rounds the behavioural #(1.0ns) delays to zero; set a
 # 1ns/1ps default timescale via an iverilog command file (process substitution -- no source stub).
 TS    = -c <(printf '+timescale+1ns/1ps\n')
-# Shared core + all loop filters + all DCOs (single-PLL testbench picks one of each via plusdefines)
-# NOTE: rtl/tech_cells/ is intentionally excluded -- the cells select a target library via a `string`
-# parameter, which iverilog mis-handles (core-dumps on an unequal-length string compare). The IP
-# sims use the DCOs' behavioural clock model (the cells are a synthesis/slang concern), so they are
-# not needed here. The cells are elaborated by yosys+slang in the chip flow.
-CORE  = $(wildcard rtl/*.sv rtl/loop_filter/*.sv rtl/dco/*.sv)
+# Shared core + all loop filters + the sim-only behavioural DCOs (single-PLL testbench picks one of
+# each via plusdefines). The DCO boundary: sims use sim/ring_dco_behavioral.sv (a fast #-delay clock,
+# stock Icarus, no PDK), NOT the structural rtl/dco/ + rtl/tech_cells/ (those are for synthesis/SPICE,
+# where yosys+slang elaborates the `Target` string-parameter cells). The ring's real freq-vs-code
+# curve is physical -> verified in SPICE, not here.
+CORE  = $(wildcard rtl/*.sv rtl/loop_filter/*.sv) sim/ring_dco_behavioral.sv
 
 .PHONY: help sim-adpll sim-adpll-survey sim-adpll-matrix sim-adpll-phase sim-adpll-csr clean
 help: ## List targets
@@ -49,14 +49,14 @@ sim-adpll-phase: ## Phase-domain ADPLL (TDC + reference/variable phase accumulat
 	@mkdir -p sim_build
 	iverilog -g2012 -o sim_build/tb_adpll_phase $(TS) \
 		rtl/adpll_freq_counter.sv rtl/adpll_lock_detector.sv rtl/adpll_tdc.sv rtl/adpll_phase_detector.sv \
-		rtl/loop_filter/adpll_loop_filter_pi.sv rtl/dco/ring_dco_binary.sv sim/tb_adpll_phase.v
+		rtl/loop_filter/adpll_loop_filter_pi.sv sim/ring_dco_behavioral.sv sim/tb_adpll_phase.v
 	vvp sim_build/tb_adpll_phase | grep -E "LOCKED|PASS|FAIL"
 
 sim-adpll-csr: ## Single-PLL CSR: program mul/div/enable over AXI4-Lite, poll STATUS for lock
 	@mkdir -p sim_build
 	iverilog -g2012 -o sim_build/tb_adpll_csr $(TS) \
 		rtl/axi/s_axi_adpll_csr.sv rtl/adpll_freq_detector.sv rtl/adpll_freq_counter.sv rtl/adpll_lock_detector.sv \
-		rtl/loop_filter/adpll_loop_filter_bangbang.sv rtl/dco/ring_dco_binary.sv sim/tb_adpll_csr.v
+		rtl/loop_filter/adpll_loop_filter_bangbang.sv sim/ring_dco_behavioral.sv sim/tb_adpll_csr.v
 	vvp sim_build/tb_adpll_csr | grep -E "CSR programmed|LOCKED|PASS|FAIL"
 
 clean: ## Remove sim build artifacts

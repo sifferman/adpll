@@ -30,7 +30,8 @@
 // matching).
 // Ring oscillator tuned by a UNIT-weighted (thermometer) delay line: code k inserts k
 // identical unit-pair delays, so the curve is monotonic by construction (2^N-1 units).
-// SYNTHESIS = structural adpll_cell_* primitives (rtl/tech_cells/); else a behavioural model.
+// Purely structural -- built from rtl/tech_cells/ primitives; the `Target` parameter picks the
+// cell library (gf180mcu_as_sc_mcu7t3v3 for synth/SPICE, behavioral for sim). No behavioural fork.
 //
 // Parameters:
 //   - NumTuneBits : tune-code width (number of delay elements)
@@ -39,8 +40,10 @@
 //   - tune_i   : unsigned tune code (higher = more delay = lower frequency)
 //   - clk_o    : oscillator output
 
+(* keep_hierarchy *)
 module ring_dco_thermometer #(
-    parameter int unsigned NumTuneBits = 7
+    parameter int unsigned NumTuneBits = 7,
+    parameter string       Target      = "behavioral"
 ) (
     input  wire                   enable_i,
     input  wire [NumTuneBits-1:0] tune_i,
@@ -48,8 +51,6 @@ module ring_dco_thermometer #(
 );
 
 localparam int unsigned NumUnits = (1 << NumTuneBits) - 1;
-
-`ifdef SYNTHESIS
 
 // Thermometer decode: unit_enable[k] = 1 iff k < tune_i.
 wire [NumUnits-1:0] unit_enable;
@@ -60,7 +61,7 @@ end
 wire feedback;
 wire [NumUnits:0] node;
 
-adpll_cell_nand2 #(.Target("gf180mcu_as_sc_mcu7t3v3")) adpll_cell_nand2 (
+adpll_cell_nand2 #(.Target(Target)) adpll_cell_nand2 (
     .A (enable_i),
     .B (feedback),
     .Y (node[0])
@@ -68,16 +69,16 @@ adpll_cell_nand2 #(.Target("gf180mcu_as_sc_mcu7t3v3")) adpll_cell_nand2 (
 
 for (genvar k_GEN = 0; k_GEN < NumUnits; k_GEN++) begin : delay_unit
     wire mid, delayed;
-    adpll_cell_inv #(.Target("gf180mcu_as_sc_mcu7t3v3")) i_inv_a (
+    adpll_cell_inv #(.Target(Target)) i_inv_a (
         .A (node[k_GEN]),
         .Y (mid)
     );
-    adpll_cell_inv #(.Target("gf180mcu_as_sc_mcu7t3v3")) i_inv_b (
+    adpll_cell_inv #(.Target(Target)) i_inv_b (
         .A (mid),
         .Y (delayed)
     );
     // Insert this unit's delay when its thermometer bit is set, else bypass.
-    adpll_cell_mux2 #(.Target("gf180mcu_as_sc_mcu7t3v3")) adpll_cell_mux2 (
+    adpll_cell_mux2 #(.Target(Target)) adpll_cell_mux2 (
         .A (node[k_GEN]),
         .B (delayed),
         .S (unit_enable[k_GEN]),
@@ -88,29 +89,4 @@ end
 assign feedback = node[NumUnits];
 assign clk_o    = node[NumUnits];
 
-`else
-
-// Behavioural model: half-period grows linearly with the number of inserted units, i.e.
-// with the binary value of tune_i -- the same monotonic curve as ring_dco_binary's behavioural
-// model (the two differ only in silicon DNL, which a zero-delay sim cannot show).
-localparam realtime BaseHalf = 1.0ns;   // half-period at tune=0
-localparam realtime StepHalf = 0.1ns;   // added half-period per tune LSB
-logic   clk_r = 1'b1;
-realtime half_period;
-
-always begin
-    if (enable_i) begin
-        half_period = BaseHalf + StepHalf * tune_i;
-        #(half_period) clk_r = ~clk_r;
-    end else begin
-        clk_r = 1'b1;
-        #(BaseHalf);
-    end
-end
-
-assign clk_o = clk_r;
-
-`endif
-
 endmodule
-

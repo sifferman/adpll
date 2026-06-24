@@ -27,35 +27,38 @@
 // ring_dco_binary
 //
 // Ref: Staszewski & Balsara (Wiley, 2006), Ch. 2-3 (ring DCO, delay tuning).
-// All-standard-cell ring oscillator: a NAND gate gates/sustains oscillation and
-// binary-weighted inverter-pair segments (one mux each) insert delay by the binary value of
-// tune_i. SYNTHESIS = structural adpll_cell_* primitives (rtl/tech_cells/); else a behavioural model.
+// All-standard-cell ring oscillator: a NAND gate gates/sustains oscillation and binary-weighted
+// inverter-pair segments (one mux each) insert delay by the binary value of tune_i. The ring is
+// purely structural -- built from rtl/tech_cells/ primitives, no behavioural fork. The `Target`
+// parameter picks the cell library, so the SAME netlist drives synthesis (gf180mcu_as_sc_mcu7t3v3)
+// and simulation (behavioral: the tech cells carry a #-delay, so the ring actually oscillates).
+// The frequency-vs-code curve is illustrative in behavioural sim; SPICE gives the real one.
 //
 // Parameters:
 //   - NumTuneBits : tune-code width (number of delay elements)
+//   - Target      : tech-cell library ("gf180mcu_as_sc_mcu7t3v3" | "behavioral")
 // Ports:
 //   - enable_i : gate oscillation
 //   - tune_i   : unsigned tune code (higher = more delay = lower frequency)
 //   - clk_o    : oscillator output
 
+(* keep_hierarchy *)
 module ring_dco_binary #(
-    parameter int unsigned NumTuneBits = 7
+    parameter int unsigned NumTuneBits = 7,
+    parameter string       Target      = "behavioral"
 ) (
     input  wire                   enable_i,
     input  wire [NumTuneBits-1:0] tune_i,
     output wire                   clk_o
 );
 
-`ifdef SYNTHESIS
-
-// Structural implementation (synthesis / SPICE extraction):
 //   node[0]          = NAND2(enable_i, feedback)
 //   node[i+1]        = mux2(bypass = node[i], delayed_i, S = tune_i[i])
 //   feedback / clk_o = node[NumTuneBits]
 wire feedback;
 wire [NumTuneBits:0] node;
 
-adpll_cell_nand2 #(.Target("gf180mcu_as_sc_mcu7t3v3")) adpll_cell_nand2 (
+adpll_cell_nand2 #(.Target(Target)) adpll_cell_nand2 (
     .A (enable_i),
     .B (feedback),
     .Y (node[0])
@@ -66,16 +69,16 @@ for (genvar i_GEN = 0; i_GEN < NumTuneBits; i_GEN++) begin : delay_segment
     wire [2*NumStages:0] d;
     assign d[0] = node[i_GEN];
     for (genvar j_GEN = 0; j_GEN < NumStages; j_GEN++) begin : inverter_pair
-        adpll_cell_inv #(.Target("gf180mcu_as_sc_mcu7t3v3")) i_inv_a (
+        adpll_cell_inv #(.Target(Target)) i_inv_a (
             .A (d[2*j_GEN]),
             .Y (d[2*j_GEN + 1])
         );
-        adpll_cell_inv #(.Target("gf180mcu_as_sc_mcu7t3v3")) i_inv_b (
+        adpll_cell_inv #(.Target(Target)) i_inv_b (
             .A (d[2*j_GEN + 1]),
             .Y (d[2*j_GEN + 2])
         );
     end
-    adpll_cell_mux2 #(.Target("gf180mcu_as_sc_mcu7t3v3")) adpll_cell_mux2 (
+    adpll_cell_mux2 #(.Target(Target)) adpll_cell_mux2 (
         .A (node[i_GEN]),
         .B (d[2*NumStages]),
         .S (tune_i[i_GEN]),
@@ -86,32 +89,4 @@ end
 assign feedback = node[NumTuneBits];
 assign clk_o    = node[NumTuneBits];
 
-`else
-
-// Behavioural model (event-driven simulation only; SYNTHESIS undefined). A real ring
-// oscillator has no period in zero-delay RTL, so clk_o is a free-running clock whose
-// half-period grows with tune_i. The numbers are illustrative; SPICE gives the true curve.
-// Half-period is a realtime built from explicit ns time literals, so the #-delays carry their
-// own units and do not depend on a `timescale. half_period >= BaseHalf > 0 always, so there
-// is never a zero-delay loop.
-localparam realtime BaseHalf = 1.0ns;   // half-period at tune=0
-localparam realtime StepHalf = 0.1ns;   // added half-period per tune LSB
-logic   clk_r = 1'b1;
-realtime half_period;
-
-always begin
-    if (enable_i) begin
-        half_period = BaseHalf + StepHalf * tune_i;
-        #(half_period) clk_r = ~clk_r;
-    end else begin
-        clk_r = 1'b1;
-        #(BaseHalf);
-    end
-end
-
-assign clk_o = clk_r;
-
-`endif
-
 endmodule
-

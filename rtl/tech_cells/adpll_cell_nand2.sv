@@ -53,16 +53,16 @@ module adpll_cell_nand2 #(
     output wire Y
 );
 
-if (Target == "gf180mcu_as_sc_mcu7t3v3") begin : g_gf180mcu_as_sc_mcu7t3v3
+if (Target == "gf180mcu_as_sc_mcu7t3v3") begin : gf180mcu_as_sc_mcu7t3v3
     (* keep *) (* dont_touch = "true" *)
     gf180mcu_as_sc_mcu7t3v3__nand2_2 gf180mcu_as_sc_mcu7t3v3__nand2_2 (
         .A (A),
         .B (B),
         .Y (Y)
     );
-end else if (Target == "behavioral") begin : g_behavioral
+end else if (Target == "behavioral") begin : behavioral
     assign #(BehavioralDelay) Y = ~(A & B);
-end else begin : g_invalid
+end else begin : invalid
     initial $fatal(1, "adpll_cell_nand2: unsupported Target \"%s\"", Target);
 end
 

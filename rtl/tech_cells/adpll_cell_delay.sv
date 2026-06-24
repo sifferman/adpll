@@ -54,15 +54,15 @@ module adpll_cell_delay #(
     output wire Y
 );
 
-if (Target == "gf180mcu_as_sc_mcu7t3v3") begin : g_gf180mcu_as_sc_mcu7t3v3
+if (Target == "gf180mcu_as_sc_mcu7t3v3") begin : gf180mcu_as_sc_mcu7t3v3
     (* keep *) (* dont_touch = "true" *)
     gf180mcu_as_sc_mcu7t3v3__dlybuff_2 gf180mcu_as_sc_mcu7t3v3__dlybuff_2 (
         .A (A),
         .Y (Y)
     );
-end else if (Target == "behavioral") begin : g_behavioral
+end else if (Target == "behavioral") begin : behavioral
     assign #(BehavioralDelay) Y = A;
-end else begin : g_invalid
+end else begin : invalid
     initial $fatal(1, "adpll_cell_delay: unsupported Target \"%s\"", Target);
 end
 

@@ -32,7 +32,8 @@
 // thermometer FINE bank whose unit delay is a single inverter pair. The coarse unit delay is
 // therefore exactly 2^NumFineBits fine units, so the two banks splice into one monotonic curve
 // (a wide range from a few coarse units, fine resolution from the fine units -- the resolution/
-// range trade a single bank can't make). SYNTHESIS = structural adpll_cell_* (rtl/tech_cells/); else behavioural.
+// range trade a single bank can't make). Purely structural -- rtl/tech_cells/ primitives; the
+// `Target` parameter picks the cell library (gf180mcu_as_sc_mcu7t3v3 / behavioral).
 //
 // Parameters:
 //   - NumTuneBits : total tune-code width
@@ -42,9 +43,11 @@
 //   - tune_i   : unsigned tune code (higher = more delay = lower frequency)
 //   - clk_o    : oscillator output
 
+(* keep_hierarchy *)
 module ring_dco_coarsefine #(
     parameter int unsigned NumTuneBits = 7,
-    parameter int unsigned NumFineBits = 3
+    parameter int unsigned NumFineBits = 3,
+    parameter string       Target      = "behavioral"
 ) (
     input  wire                   enable_i,
     input  wire [NumTuneBits-1:0] tune_i,
@@ -62,12 +65,10 @@ localparam int unsigned CoarsePairs    = (1 << NumFineBits);   // inverter pairs
 wire [NumCoarseBits-1:0] coarse_code = tune_i[NumTuneBits-1:NumFineBits];
 wire [NumFineBits-1:0]   fine_code   = tune_i[NumFineBits-1:0];
 
-`ifdef SYNTHESIS
-
 wire feedback;
 wire [NumCoarseUnits:0] coarse_node;
 
-adpll_cell_nand2 #(.Target("gf180mcu_as_sc_mcu7t3v3")) adpll_cell_nand2 (
+adpll_cell_nand2 #(.Target(Target)) adpll_cell_nand2 (
     .A (enable_i),
     .B (feedback),
     .Y (coarse_node[0])
@@ -78,16 +79,16 @@ for (genvar k_GEN = 0; k_GEN < NumCoarseUnits; k_GEN++) begin : coarse_unit
     wire [2*CoarsePairs:0] d;
     assign d[0] = coarse_node[k_GEN];
     for (genvar j_GEN = 0; j_GEN < CoarsePairs; j_GEN++) begin : inverter_pair
-        adpll_cell_inv #(.Target("gf180mcu_as_sc_mcu7t3v3")) i_inv_a (
+        adpll_cell_inv #(.Target(Target)) i_inv_a (
             .A (d[2*j_GEN]),
             .Y (d[2*j_GEN + 1])
         );
-        adpll_cell_inv #(.Target("gf180mcu_as_sc_mcu7t3v3")) i_inv_b (
+        adpll_cell_inv #(.Target(Target)) i_inv_b (
             .A (d[2*j_GEN + 1]),
             .Y (d[2*j_GEN + 2])
         );
     end
-    adpll_cell_mux2 #(.Target("gf180mcu_as_sc_mcu7t3v3")) adpll_cell_mux2 (
+    adpll_cell_mux2 #(.Target(Target)) adpll_cell_mux2 (
         .A (coarse_node[k_GEN]),
         .B (d[2*CoarsePairs]),
         .S (k_GEN < coarse_code),
@@ -100,15 +101,15 @@ wire [NumFineUnits:0] fine_node;
 assign fine_node[0] = coarse_node[NumCoarseUnits];
 for (genvar k_GEN = 0; k_GEN < NumFineUnits; k_GEN++) begin : fine_unit
     wire mid, delayed;
-    adpll_cell_inv #(.Target("gf180mcu_as_sc_mcu7t3v3")) i_inv_a (
+    adpll_cell_inv #(.Target(Target)) i_inv_a (
         .A (fine_node[k_GEN]),
         .Y (mid)
     );
-    adpll_cell_inv #(.Target("gf180mcu_as_sc_mcu7t3v3")) i_inv_b (
+    adpll_cell_inv #(.Target(Target)) i_inv_b (
         .A (mid),
         .Y (delayed)
     );
-    adpll_cell_mux2 #(.Target("gf180mcu_as_sc_mcu7t3v3")) adpll_cell_mux2 (
+    adpll_cell_mux2 #(.Target(Target)) adpll_cell_mux2 (
         .A (fine_node[k_GEN]),
         .B (delayed),
         .S (k_GEN < fine_code),
@@ -118,31 +119,5 @@ end
 
 assign feedback = fine_node[NumFineUnits];
 assign clk_o    = fine_node[NumFineUnits];
-
-`else
-
-// Behavioural model: a coarse unit delay is exactly 2^NumFineBits fine units, so
-// CoarseHalf*coarse + FineHalf*fine == FineHalf*tune_i -- the same monotonic curve as the
-// single-bank DCOs (they differ only in silicon coarse/fine mismatch, which a zero-delay sim
-// cannot show). half_period >= BaseHalf > 0 always, so there is never a zero-delay loop.
-localparam realtime BaseHalf   = 1.0ns;                       // half-period at tune=0
-localparam realtime FineHalf   = 0.1ns;                       // added half-period per fine LSB
-localparam realtime CoarseHalf = FineHalf * (1 << NumFineBits);  // added half-period per coarse LSB
-logic   clk_r = 1'b1;
-realtime half_period;
-
-always begin
-    if (enable_i) begin
-        half_period = BaseHalf + CoarseHalf * coarse_code + FineHalf * fine_code;
-        #(half_period) clk_r = ~clk_r;
-    end else begin
-        clk_r = 1'b1;
-        #(BaseHalf);
-    end
-end
-
-assign clk_o = clk_r;
-
-`endif
 
 endmodule

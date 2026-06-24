@@ -59,12 +59,12 @@ rtl/tech_cells   adpll_cell_delay / inv / nand2 / mux2 -- the PDK-specific primi
 rtl/loop_filter  bangbang / pi / gearshift loop filters
 rtl/dco          binary / thermometer / muxtap / coarsefine ring DCOs
 rtl/axi          s_axi_adpll_csr (AXI4-Lite control/status)
-sim/             self-contained Icarus testbenches
+sim/             self-contained Icarus testbenches + ring_dco_behavioral.sv (sim-only DCO model)
 scripts/         characterize_pll.py, plot_pll.py (loop/DCO analysis + figures)
 docs/            adpll_survey.md (the variant survey, citations, results) + figures
 ```
 
-## Verify (Icarus, no PDK)
+## Verify
 
 ```sh
 make sim-adpll          # ring DCO oscillates + the loop locks
@@ -74,9 +74,20 @@ make sim-adpll-phase    # phase-domain ADPLL (TDC): true phase lock
 make sim-adpll-csr      # single-PLL CSR over AXI4-Lite
 ```
 
-DCO frequency-vs-code is physical, so it is characterized in **SPICE**, not RTL. That flow is
-moving to OpenROAD/Magic parasitic extraction from the hardened `ring_dco` macro (single source of
-truth = the `.sv`); the former hand-written netlist generator has been removed.
+These run on **stock Icarus** (no PDK, no patched tools). The trick is the **DCO boundary**: the
+real `rtl/dco/` rings are purely structural (built from `rtl/tech_cells/`), which is correct for
+synthesis/SPICE but slow to simulate and not frequency-matched across variants. The digital sims
+don't care how the ring is built, only that its frequency falls with `tune_i` — so the testbenches
+compile `sim/ring_dco_behavioral.sv` (a fast `#`-delay clock with the same module/port/param
+interface) instead of `rtl/dco/`, keeping the detector / loop filter / lock detector / CSR — the
+actual digital logic — under test. The ring's real frequency-vs-code curve is physical and is
+verified in **SPICE** (OpenROAD/Magic parasitic extraction from the hardened `ring_dco`).
+
+The `ring_dco_*` modules carry `(* keep_hierarchy *)` so they survive as a swappable boundary in the
+synthesized netlist: **post-synthesis gate-level sims** substitute the gate ring for
+`sim/ring_dco_behavioral.sv` the same way, exercising the real synthesized control logic without
+trying to simulate the ring. Synthesis (yosys + slang) elaborates the structural
+`Target="gf180mcu_as_sc_mcu7t3v3"` cells directly — no patched-tool dependency.
 
 ## Portability
 
@@ -87,11 +98,11 @@ Each wrapper picks its implementation from a `Target` **string parameter** (not 
 DCOs pass `Target="gf180mcu_as_sc_mcu7t3v3"` (the gf180 3.3 V cell, `inv_2`/`nand2_2`/`mux2_2`/
 `dlybuff_2`, with `keep`/`dont_touch`), and the default `"behavioral"` is an RTL `#`-delay model; an
 unknown target is a `$fatal`. **To retarget a PDK (sky130, ASAP7, …), add a branch in `rtl/tech_cells/`
-and pass its name as `Target`** — the rings, TDC, detectors, and loop filters are untouched. The DCO
-loop-lock simulations use the DCOs' own behavioural clock model (the `Target` cells are a synthesis
-concern); the ring's real frequency-vs-code curve is physical and is characterised in **SPICE**, not
-RTL. Keep the ring's combinational loop out of optimization (`keep`/`dont_touch`) and out of the
-clock-tree/STA (leave the DCO clock undefined in SDC).
+and pass its name as `Target`** — the rings, TDC, detectors, and loop filters are untouched. For
+simulation the testbenches swap in a sim-only behavioural DCO model (`sim/ring_dco_behavioral.sv`)
+rather than build the structural ring; the ring's real frequency-vs-code curve is physical and is
+characterised in **SPICE**, not RTL. Keep the ring's combinational loop out of optimization
+(`keep`/`dont_touch`) and out of the clock-tree/STA (leave the DCO clock undefined in SDC).
 
 ## License
 
