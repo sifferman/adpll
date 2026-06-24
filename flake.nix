@@ -9,7 +9,9 @@
   };
 
   inputs = {
-    librelane.url = "github:librelane/librelane/dev";
+    # Pinned to the same rev the consuming project uses, so the fossi-foundation cache has the
+    # devshell prebuilt (a floating dev rev would force a from-source build in CI).
+    librelane.url = "github:librelane/librelane/3131cc551528fb4b06ce30aa7219a2a3718c333e";
   };
 
   outputs =
