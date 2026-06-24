@@ -1,0 +1,41 @@
+* ADPLL closed-loop COSIM testbench: extracted ring DCO in ngspice + digital loop in Verilog (d_cosim).
+* Static deck -- no templating. ngspice expands $PDK_ROOT (the standard PDK env var) in .include
+* paths; the gf180mcuD symlink under it is followed on open. run_cosim.sh provides two run-specific
+* includes: corner.lib (the .lib section -- a section name can't be an env var) and ring.spice (the
+* hardened ring netlist, its .subckt renamed to the fixed name "dco").
+.include $PDK_ROOT/gf180mcuD/libs.tech/ngspice/design.ngspice
+.include corner.lib
+.include ring.spice
+.temp 25
+.param VDD=3.3
+Vdd VDD 0 {VDD}
+Vss VSS 0 0
+
+* ---- digital loop (Verilog via d_cosim): in [clk rst dco en] out [tune0..6 lock] ----
+* (input/output vector order matches adpll_loop_obj_dir/inputs.h,outputs.h -- Verilator reorders ports)
+.model loopm d_cosim (simulation="./adpll_loop.so")
+a_loop [ref_d rst_d dco_d en_d] [t0 t1 t2 t3 t4 t5 t6 lock_d] loopm
+
+* ---- ring DCO (analog): VDD VSS clk_o enable_i tune_i[0..6]; tune is MSB-first out of d_cosim ----
+X_dco VDD VSS dco_clk en_a ta6 ta5 ta4 ta3 ta2 ta1 ta0 dco
+Cload dco_clk 0 2f
+
+* ---- A/D + D/A bridges (ps delays so the adc tracks the ~336 MHz DCO) ----
+.model adcm adc_bridge (in_low=1.0 in_high=2.0 rise_delay=10p fall_delay=10p)
+.model dacm dac_bridge (out_low=0 out_high={VDD} rise_delay=10p fall_delay=10p)
+a_adc_dco [dco_clk] [dco_d] adcm
+Vref refclk 0 PULSE(0 {VDD} 0 0.1n 0.1n 2.4n 5n)
+a_adc_ref [refclk] [ref_d] adcm
+Vrst rst_aa 0 PWL(0 0 30n 0 30.1n {VDD})
+a_adc_rst [rst_aa] [rst_d] adcm
+Ven en_a 0 PWL(0 0 40n 0 40.1n {VDD})
+a_adc_en [en_a] [en_d] adcm
+a_dac_tune [t0 t1 t2 t3 t4 t5 t6] [ta0 ta1 ta2 ta3 ta4 ta5 ta6] dacm
+a_dac_lock [lock_d] [lock_a] dacm
+
+.tran 20p 1000n uic
+.control
+run
+meas tran t_lock when v(lock_a)=1.65 rise=1
+.endc
+.end

@@ -1,4 +1,8 @@
 *.so
 *_obj_dir/
+ring.spice
 ring_dco_binary.spice
-*.txt
+corner.lib
+chk.spice
+cosim_*.txt
+ngspice_*.log

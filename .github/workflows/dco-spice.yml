@@ -1,22 +1,17 @@
-# DCO SPICE characterisation: harden one ring_dco as a macro, extract its parasitic netlist
-# (Magic), and sweep the tune code through ngspice -> frequency-vs-code. This is the DCO sign-off
-# (the ring's frequency is physical, not RTL), driven straight from the .sv via the real flow.
+# DCO SPICE characterisation: for EACH ring_dco variant, harden it as a macro, extract the parasitic
+# netlist (Magic), and sweep the tune code through ngspice -> frequency-vs-code, at ALL process
+# corners (typical / ss / ff). The DCO sign-off -- the ring's frequency is physical, straight from
+# the .sv via the real flow. The harden is corner-independent, so each job hardens once and sweeps
+# every corner; the 4 DCO variants fan out as a matrix.
 #
-# Heavy (~15-25 min: a full harden + a transient per code), so it runs on demand and only when the
-# DCO / tech cells / harden config change -- not on every push.
-#
-# The toolchain (librelane + openroad + magic + yosys + ciel + ngspice + make) comes from the Nix
-# flake (devshell), pulled prebuilt from the fossi-foundation cache. We ciel-enable the pinned
-# gf180 PDK and call `make dco-spice` (which auto-locates the PDK SPICE models under PDK_ROOT).
+# Heavy (full harden + a transient per code per corner), so it runs on demand and when the DCO /
+# tech cells / flow change. Toolchain comes from the Nix flake (fossi-foundation cache).
 
 name: DCO SPICE
 
 on:
   workflow_dispatch:
     inputs:
-      dco:
-        description: "ring_dco variant to characterise"
-        default: ring_dco_binary
       dco_tune:
         description: "comma-separated DCO tune codes"
         default: "0,8,16,32,64,96,127"
@@ -32,6 +27,14 @@ on:
 jobs:
   dco-spice:
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        dco:
+          - ring_dco_binary
+          - ring_dco_thermometer
+          - ring_dco_muxtap
+          - ring_dco_coarsefine
     steps:
       - name: Maximize build space
         uses: AdityaGarg8/remove-unwanted-software@v5
@@ -52,9 +55,9 @@ jobs:
             extra-substituters = https://nix-cache.fossi-foundation.org
             extra-trusted-public-keys = nix-cache.fossi-foundation.org:3+K59iFwXqKsL7BNu6Guy0v+uTlwsxYQxjspXzqLYQs=
 
-      - name: Harden ring_dco + ngspice tune sweep
+      - name: Harden ${{ matrix.dco }} + ngspice tune sweep (all corners)
         env:
-          DCO: ${{ github.event.inputs.dco || 'ring_dco_binary' }}
+          DCO: ${{ matrix.dco }}
           DCO_TUNE: ${{ github.event.inputs.dco_tune || '0,8,16,32,64,96,127' }}
         run: |
           nix develop --accept-flake-config --command bash -ceu '
@@ -62,22 +65,23 @@ jobs:
               --pdk-root "$PWD/.pdk" --pdk-family gf180mcuD --include-libraries all
             make dco-spice \
               PDK_ROOT="$PWD/.pdk" PDK=gf180mcuD SCL=gf180mcu_as_sc_mcu7t3v3 NGSPICE=ngspice \
-              DCO="$DCO" DCO_TUNE="$DCO_TUNE"
+              DCO="$DCO" DCO_TUNE="$DCO_TUNE" CORNERS=typical,ss,ff
           '
-          # the verbose harden log is in this step above; dco_freq.txt holds just the freq table
 
-      - name: Report freq-vs-code
+      - name: Report freq-vs-code (all corners)
         if: always()
         run: |
-          { echo '### DCO frequency-vs-code (SPICE, extracted)'; echo '```'; \
-            cat dco_freq.txt 2>/dev/null; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          for c in typical ss ff; do
+            f="dco_freq_${{ matrix.dco }}_$c.txt"
+            { echo "### ${{ matrix.dco }} @ $c"; echo '```'; cat "$f" 2>/dev/null || echo "(missing)"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          done
 
-      - name: Upload extracted netlist + results
+      - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dco-spice
+          name: dco-spice-${{ matrix.dco }}
           path: |
-            dco_freq.txt
+            dco_freq_${{ matrix.dco }}_*.txt
             librelane/runs/*/final/spice/*.spice
           if-no-files-found: ignore

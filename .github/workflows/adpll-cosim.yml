@@ -1,0 +1,81 @@
+# Full-ADPLL closed-loop lock via mixed-signal CO-SIMULATION: the extracted ring DCO runs in ngspice
+# (real transistors) and the digital loop runs in Verilog through ngspice's d_cosim, coupled into a
+# true closed loop. Matrix = all 12 adpll_<filter>_<dco> configs x all process corners. Per cell:
+# harden the ring (corner-independent), build the loop .so for the filter, run ngspice at the corner.
+#
+# EXPERIMENTAL (hence workflow_dispatch + fail-fast:false): a cell locks only if the baked mul/div
+# (12/8 -> 300 MHz @ 200 MHz ref) is reachable by that DCO at that corner. Coarse / multi-mode rings
+# need per-config mul/div tuning for a clean lock -- red cells flag those, they are not flow bugs.
+# Heavy: each cell is a transistor-level ring transient (~minutes). See cosim/README.md.
+
+name: ADPLL cosim (experimental)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cosim:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        adpll:
+          - adpll_bangbang_binary
+          - adpll_bangbang_thermometer
+          - adpll_bangbang_muxtap
+          - adpll_bangbang_coarsefine
+          - adpll_linear_binary
+          - adpll_linear_thermometer
+          - adpll_linear_muxtap
+          - adpll_linear_coarsefine
+          - adpll_gearshift_binary
+          - adpll_gearshift_thermometer
+          - adpll_gearshift_muxtap
+          - adpll_gearshift_coarsefine
+        corner: [typical, ss, ff]
+    steps:
+      - name: Maximize build space
+        uses: AdityaGarg8/remove-unwanted-software@v5
+        with:
+          remove-dotnet: "true"
+          remove-android: "true"
+          remove-haskell: "true"
+          remove-codeql: "true"
+          remove-docker-images: "true"
+
+      - uses: actions/checkout@v4
+
+      - name: Setup Nix
+        uses: DeterminateSystems/nix-installer-action@main
+        with:
+          determinate: false
+          extra-conf: |
+            extra-substituters = https://nix-cache.fossi-foundation.org
+            extra-trusted-public-keys = nix-cache.fossi-foundation.org:3+K59iFwXqKsL7BNu6Guy0v+uTlwsxYQxjspXzqLYQs=
+
+      - name: Cosim ${{ matrix.adpll }} @ ${{ matrix.corner }}
+        env:
+          ADPLL: ${{ matrix.adpll }}
+          CORNER: ${{ matrix.corner }}
+        run: |
+          nix develop --accept-flake-config --command bash -ceu '
+            ciel enable 019cf7a3e0de79bb0e4b6213758882d283c65816 \
+              --pdk-root "$PWD/.pdk" --pdk-family gf180mcuD --include-libraries all
+            make cosim PDK_ROOT="$PWD/.pdk" PDK=gf180mcuD SCL=gf180mcu_as_sc_mcu7t3v3 \
+              ADPLL="$ADPLL" CORNER="$CORNER"
+          '
+
+      - name: Report
+        if: always()
+        run: |
+          { echo "### ${{ matrix.adpll }} @ ${{ matrix.corner }}"; echo '```'; \
+            cat cosim/cosim_${{ matrix.adpll }}_${{ matrix.corner }}.txt 2>/dev/null || echo "(no result)"; \
+            echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cosim-${{ matrix.adpll }}-${{ matrix.corner }}
+          path: cosim/cosim_*.txt
+          if-no-files-found: ignore

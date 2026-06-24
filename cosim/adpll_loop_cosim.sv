@@ -1,6 +1,7 @@
-// Loop-only ADPLL top for ngspice d_cosim: detector + bang-bang filter + lock detector.
+// Loop-only ADPLL top for ngspice d_cosim: detector + loop filter + lock detector.
 // The DCO is NOT here -- it lives in ngspice (analog ring). dco_clk_i arrives via an adc_bridge,
 // tune_o leaves via a dac_bridge. mul/div are baked for the POC (target ~300 MHz at 200 MHz ref).
+// Loop filter selected at build time: +define+FILTER_PI or +define+FILTER_GEARSHIFT, else bang-bang.
 module adpll_loop_cosim (
     input  logic       clk_i,       // reference clock (from ngspice)
     input  logic       rst_ni,
@@ -25,10 +26,23 @@ wire [NumTuneBits-1:0]       tune, lock_sample;
 adpll_freq_detector #(.MaxEdgesPerWindow(MaxEdgesPerWindow), .MaxWindowSize(MaxWindowSize)) det (
     .clk_i, .rst_ni, .enable_i, .target_i(REF_MUL), .window_length_i(REF_DIV),
     .dco_clk_i, .error_o(error), .valid_o(valid));
+`ifdef FILTER_PI
+localparam int unsigned BandRadius = 2;
+adpll_loop_filter_pi #(.NumTuneBits(NumTuneBits), .ErrorWidth(ErrorWidth)) lf (
+    .clk_i, .rst_ni, .enable_i, .valid_i(valid), .error_i(error),
+    .tune_o(tune), .lock_sample_o(lock_sample));
+`elsif FILTER_GEARSHIFT
+localparam int unsigned BandRadius = 1;
+adpll_loop_filter_gearshift #(.NumTuneBits(NumTuneBits), .ErrorWidth(ErrorWidth)) lf (
+    .clk_i, .rst_ni, .enable_i, .valid_i(valid), .error_i(error),
+    .tune_o(tune), .lock_sample_o(lock_sample));
+`else
+localparam int unsigned BandRadius = 1;
 adpll_loop_filter_bangbang #(.NumTuneBits(NumTuneBits), .ErrorWidth(ErrorWidth)) lf (
     .clk_i, .rst_ni, .enable_i, .valid_i(valid), .error_i(error),
     .tune_o(tune), .lock_sample_o(lock_sample));
-adpll_lock_detector #(.SampleWidth(NumTuneBits), .MinSamplesForLock(8), .BandRadius(1)) ld (
+`endif
+adpll_lock_detector #(.SampleWidth(NumTuneBits), .MinSamplesForLock(8), .BandRadius(BandRadius)) ld (
     .clk_i, .rst_ni, .enable_i, .sample_valid_i(valid), .tuning_sample_i(lock_sample), .lock_o(lock_o));
 assign tune_o = tune;
 `ifdef DBGPRINT

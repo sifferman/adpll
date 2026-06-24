@@ -46,6 +46,7 @@ module adpll_loop_filter_bangbang #(
 ) (
     input  logic                         clk_i,
     input  logic                         rst_ni,
+
     input  logic                         enable_i,
     input  logic                         valid_i,
     input  logic signed [ErrorWidth-1:0] error_i,

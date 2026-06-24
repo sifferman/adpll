@@ -40,12 +40,12 @@
 module adpll_post_divider #(
     parameter int unsigned DivisorWidth = 8
 ) (
-    input  logic                   clk_i,
-    input  logic                   rst_ni,
+    input  logic                    clk_i,
+    input  logic                    rst_ni,
 
-    input  logic                   enable_i,
+    input  logic                    enable_i,
     input  logic [DivisorWidth-1:0] divisor_i,
-    output logic                   clk_o
+    output logic                    clk_o
 );
 
 logic [DivisorWidth-1:0] count_d, count_q;

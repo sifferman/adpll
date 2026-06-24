@@ -11,7 +11,10 @@ TS    = -c <(printf '+timescale+1ns/1ps\n')
 # stock Icarus, no PDK), NOT the structural rtl/dco/ + rtl/tech_cells/ (those are for synthesis/SPICE,
 # where yosys+slang elaborates the `Target` string-parameter cells). The ring's real freq-vs-code
 # curve is physical -> verified in SPICE, not here.
-CORE  = $(wildcard rtl/*.sv rtl/loop_filter/*.sv) sim/ring_dco_behavioral.sv
+# Exclude the structural adpll_tdc.sv (instantiates the gf180 adpll_cell_delay, unknown to iverilog) --
+# sims use the behavioural TDC model, like the behavioural DCO (the TDC boundary).
+CORE  = $(filter-out rtl/adpll_tdc.sv,$(wildcard rtl/*.sv rtl/loop_filter/*.sv)) \
+        sim/ring_dco_behavioral.sv sim/adpll_tdc_behavioral.sv
 
 .PHONY: help sim-adpll sim-adpll-survey sim-adpll-matrix sim-adpll-phase sim-adpll-csr clean
 help: ## List targets
@@ -68,6 +71,8 @@ DCO_TUNE    ?= 0,8,16,32,64,96,127
 ADPLL       ?= adpll_bangbang_binary
 REF_MHZ     ?= 200
 RATIOS      ?= 8/8,10/8,12/8,14/8
+CORNERS     ?= typical,ss,ff
+CORNER      ?= typical
 NGSPICE     ?= ngspice
 PDK_NGSPICE ?= $(shell find $(PDK_ROOT) -type d -path '*/$(PDK)/libs.tech/ngspice' 2>/dev/null | head -1)
 .PHONY: dco-spice
@@ -75,20 +80,31 @@ dco-spice: ## Harden a ring_dco macro + ngspice tune sweep (freq-vs-code). Needs
 	@test -n "$(PDK_NGSPICE)" || { echo "ERROR: PDK_NGSPICE empty -- no '*/$(PDK)/libs.tech/ngspice' under PDK_ROOT=$(PDK_ROOT). Is the PDK enabled?"; exit 1; }
 	@echo "PDK_NGSPICE = $(PDK_NGSPICE)"
 	librelane librelane/ring_dco.yaml --pdk $(PDK) --pdk-root $(PDK_ROOT) --scl $(SCL) -c DESIGN_NAME=$(DCO)
-	python3 librelane/dco_freq.py \
-		--extracted $$(ls -td librelane/runs/*/final/spice/$(DCO).spice | head -1) \
-		--pdk-ngspice $(PDK_NGSPICE) --ngspice $(NGSPICE) --design $(DCO) --bits 7 --dco-tune $(DCO_TUNE) \
-		--out dco_freq.txt
+	@ext=$$(ls -td librelane/runs/*/final/spice/$(DCO).spice | head -1); \
+	for c in $$(echo $(CORNERS) | tr ',' ' '); do \
+		echo "==== $(DCO) corner=$$c ===="; \
+		python3 librelane/dco_freq.py --extracted $$ext \
+			--pdk-ngspice $(PDK_NGSPICE) --ngspice $(NGSPICE) --design $(DCO) --bits 7 \
+			--dco-tune $(DCO_TUNE) --corner $$c --out dco_freq_$(DCO)_$$c.txt; \
+	done
 
 .PHONY: adpll-spice
 adpll-spice: ## Harden a (shrunk) full adpll + closed-loop ngspice until lock (time-to-lock + locked freq).
 	@test -n "$(PDK_NGSPICE)" || { echo "ERROR: PDK_NGSPICE empty -- no '*/$(PDK)/libs.tech/ngspice' under PDK_ROOT=$(PDK_ROOT). Is the PDK enabled?"; exit 1; }
 	@echo "PDK_NGSPICE = $(PDK_NGSPICE)"
 	librelane librelane/adpll.yaml --pdk $(PDK) --pdk-root $(PDK_ROOT) --scl $(SCL) -c DESIGN_NAME=$(ADPLL)
-	python3 librelane/adpll_lock.py \
-		--extracted $$(ls -td librelane/runs/*/final/spice/$(ADPLL).spice | head -1) \
-		--pdk-ngspice $(PDK_NGSPICE) --ngspice $(NGSPICE) --design $(ADPLL) \
-		--ref-mhz $(REF_MHZ) --ratios $(RATIOS) --out adpll_lock.txt
+	@ext=$$(ls -td librelane/runs/*/final/spice/$(ADPLL).spice | head -1); \
+	for c in $$(echo $(CORNERS) | tr ',' ' '); do \
+		echo "==== $(ADPLL) corner=$$c ===="; \
+		python3 librelane/adpll_lock.py --extracted $$ext \
+			--pdk-ngspice $(PDK_NGSPICE) --ngspice $(NGSPICE) --design $(ADPLL) \
+			--ref-mhz $(REF_MHZ) --ratios $(RATIOS) --corner $$c --out adpll_lock_$(ADPLL)_$$c.txt; \
+	done
+
+.PHONY: cosim
+cosim: ## Mixed-signal cosim: ngspice ring DCO + Verilog loop (d_cosim) -> lock. ADPLL=<config> CORNER=<corner>
+	@test -n "$(PDK_NGSPICE)" || { echo "ERROR: PDK_NGSPICE empty -- no '*/$(PDK)/libs.tech/ngspice' under PDK_ROOT=$(PDK_ROOT). Is the PDK enabled?"; exit 1; }
+	cd cosim && PDK=$(PDK) PDK_ROOT=$(PDK_ROOT) SCL=$(SCL) ./run_cosim.sh $(ADPLL) $(CORNER)
 
 clean: ## Remove sim build artifacts
 	rm -rf sim_build

@@ -17,21 +17,24 @@ scales: the analog cost is fixed at the ring regardless of how much digital logi
 ## Files
 
 - `adpll_loop_cosim.sv` — the digital loop top (detector + filter + lock), `dco_clk_i` as an input,
-  `tune_o`/`lock_o` as outputs. mul/div baked for the POC. DCO is **not** here.
+  `tune_o`/`lock_o` as outputs. mul/div baked for the POC. DCO is **not** here. Loop filter selected
+  at build with `+define+FILTER_PI` / `+define+FILTER_GEARSHIFT` (else bang-bang).
 - `build_cosim_so.sh` + `gen_headers.py` — build the `d_cosim` shared library from Verilog.
-- `adpll_cosim.cir` — the ngspice deck: ring DCO + `d_cosim` loop + `adc_bridge`/`dac_bridge`.
+- `adpll_cosim_tb.spice` — the **static** ngspice deck: ring DCO + `d_cosim` loop + bridges. It
+  `.include $PDK_ROOT/gf180mcuD/libs.tech/ngspice/...` (env var, expanded by ngspice) + `corner.lib`
+  + `ring.spice`.
+- `run_cosim.sh` — orchestrates one (config, corner): harden the ring, build the loop `.so`, write
+  `corner.lib` + `ring.spice`, run ngspice. Driven by `make cosim` (CI: `adpll-cosim.yml`).
 
 ## Run
 
-    cd third_party/adpll/cosim
-    make -C .. dco-spice DCO=ring_dco_binary          # produces the extracted ring netlist
-    cp ../librelane/runs/*/final/spice/ring_dco_binary.spice .
-    nix develop ../../.. -c ./build_cosim_so.sh adpll_loop \
-        adpll_loop_cosim.sv ../rtl/adpll_freq_detector.sv ../rtl/adpll_freq_counter.sv \
-        ../rtl/loop_filter/adpll_loop_filter_bangbang.sv ../rtl/adpll_lock_detector.sv
-    # edit adpll_cosim.cir's PDK ngspice path, then:
-    nix develop ../../.. -c env -u DISPLAY \
-        LD_LIBRARY_PATH=$(ls -d /nix/store/*gcc-14*-lib/lib | head -1) ngspice -b adpll_cosim.cir
+    # one config at one corner (needs the nix devshell + an enabled PDK at $PDK_ROOT):
+    nix develop ../.. -c make -C third_party/adpll cosim \
+        ADPLL=adpll_bangbang_binary CORNER=typical PDK_ROOT=$PDK_ROOT
+    # -> cosim_adpll_bangbang_binary_typical.txt  (LOCKED <t_lock> | NO-LOCK)
+
+The deck reads `$PDK_ROOT` from the environment (the standard PDK env var); the `gf180mcuD` symlink
+under it is followed on open, so no path templating is needed.
 
 ## Gotchas (each one cost a debugging cycle — read before editing)
 

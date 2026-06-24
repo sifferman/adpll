@@ -1,0 +1,29 @@
+# Full-ADPLL closed-loop lock verification, behavioural path: all 12 adpll_<filter>_<dco> configs
+# locked in Icarus with the behavioural ring-DCO model (a #-delay clock, no PDK). Fast and reliable
+# -- this is the digital-loop sign-off. There is no process-corner axis here: the behavioural DCO is
+# a pure #-delay model, not a silicon corner. Corners belong to the SPICE flows (dco-spice.yml for
+# the DCO, adpll-cosim.yml for the real-ring closed loop).
+
+name: ADPLL lock (behavioral)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'rtl/**'
+      - 'sim/**'
+      - 'Makefile'
+      - '.github/workflows/adpll-lock.yml'
+
+jobs:
+  behavioral-icarus:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install iverilog
+        run: sudo apt-get update && sudo apt-get install -y iverilog
+      - name: All 12 ADPLL configs lock (behavioral DCO)
+        run: |
+          make sim-adpll-matrix | tee matrix.txt
+          { echo '### ADPLL behavioral lock (3 filters x 4 DCOs)'; echo '```'; cat matrix.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          if grep -qE "NO-LOCK|FAIL" matrix.txt; then echo "::error::a config failed to lock"; exit 1; fi
