@@ -45,14 +45,14 @@ module adpll_lock_detector #(
     parameter int unsigned MinSamplesForLock = 8,
     parameter int unsigned BandRadius  = 1
 ) (
-    input  wire                   clk_i,
-    input  wire                   rst_ni,
+    input  logic                  clk_i,
+    input  logic                  rst_ni,
 
-    input  wire                   enable_i,
-    input  wire                   sample_valid_i,
-    input  wire [SampleWidth-1:0] tuning_sample_i,
+    input  logic                  enable_i,
+    input  logic                  sample_valid_i,
+    input  logic[SampleWidth-1:0] tuning_sample_i,
 
-    output wire                   lock_o
+    output logic                  lock_o
 );
 
 logic [SampleWidth-1:0]                 band_center_d, band_center_q;

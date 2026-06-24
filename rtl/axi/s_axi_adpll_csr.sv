@@ -26,77 +26,81 @@
 
 // s_axi_adpll_csr
 //
-// AXI4-Lite slave control/status registers for a single ADPLL. A host sets the synthesizer
-// ratio (F_DCO = (mul/div)*F_clk) and enables the loop, and reads back lock + the live tune
-// code. Single outstanding transaction. Port style follows alexforencich/verilog-axi
-// (clk/rst active-high, DATA/ADDR/STRB params, aligned s_axil_* signals).
+// AXI4-Lite slave control/status registers for a single ADPLL. A host sets the synthesizer ratio
+// (clk_o = (ref_mul/ref_div/post_div)*F_clk) and enables the loop, then reads back lock + the live
+// tune code. Single outstanding transaction. Port style follows alexforencich/verilog-axi.
 //
 // Register map (word-addressed, byte offsets):
-//   0x0 CTRL    [0]      enable          (R/W)
-//   0x4 MUL     [EdgeCountWidth-1:0] mul (N)  (R/W)
-//   0x8 DIV     [WindowSizeWidth-1:0] div (M) (R/W)
-//   0xC STATUS  [0] lock, [NumTuneBits:1] tune (RO)
+//   0x0  CTRL     [0] enable                                (R/W)
+//   0x4  REF_MUL  [EdgeCountWidth-1:0] ref_mul  (N)         (R/W)
+//   0x8  REF_DIV  [WindowSizeWidth-1:0] ref_div (M)         (R/W)
+//   0xC  STATUS   [0] lock, [NumTuneBits:1] tune            (RO)
+//   0x10 POST_DIV [PostDividerDivideWidth-1:0] post_div (K) (R/W)
 
 module s_axi_adpll_csr #(
-    // Width of data bus in bits
-    parameter  int unsigned DATA_WIDTH        = 32,
-    // Width of address bus in bits
-    parameter  int unsigned ADDR_WIDTH        = 32,
-    // Width of wstrb (width of data bus in words)
-    parameter  int unsigned STRB_WIDTH        = (DATA_WIDTH/8),
+    parameter  int unsigned DATA_WIDTH             = 32,
+    parameter  int unsigned ADDR_WIDTH             = 32,
+    localparam int unsigned STRB_WIDTH             = (DATA_WIDTH/8),
     // DCO tune-code width
-    parameter  int unsigned NumTuneBits       = 7,
-    // Max DCO edges per window (sets the mul field width)
-    parameter  int unsigned MaxEdgesPerWindow = (1 << 24) - 1,
-    localparam int unsigned EdgeCountWidth    = $clog2(MaxEdgesPerWindow + 1),
-    // Max measurement window length (sets the div field width)
-    parameter  int unsigned MaxWindowSize     = (1 << 16) - 1,
-    localparam int unsigned WindowSizeWidth   = $clog2(MaxWindowSize + 1)
+    parameter  int unsigned NumTuneBits            = 7,
+    // Max DCO edges per window (sets the ref_mul field width)
+    parameter  int unsigned MaxEdgesPerWindow      = (1 << 24) - 1,
+    localparam int unsigned EdgeCountWidth         = $clog2(MaxEdgesPerWindow + 1),
+    // Max measurement window length (sets the ref_div field width)
+    parameter  int unsigned MaxWindowSize          = (1 << 16) - 1,
+    localparam int unsigned WindowSizeWidth        = $clog2(MaxWindowSize + 1),
+    // Max output edge-divider ratio (sets the post_div field width)
+    parameter  int unsigned PostDividerMaxDivide   = 255,
+    localparam int unsigned PostDividerDivideWidth = $clog2(PostDividerMaxDivide + 1)
 ) (
-    input  wire                   clk,
-    input  wire                   rst,
+    input  logic                  clk,
+    input  logic                  rst,
 
-    input  wire [ADDR_WIDTH-1:0]  s_axil_awaddr,
-    input  wire [2:0]             s_axil_awprot,
-    input  wire                   s_axil_awvalid,
-    output wire                   s_axil_awready,
-    input  wire [DATA_WIDTH-1:0]  s_axil_wdata,
-    input  wire [STRB_WIDTH-1:0]  s_axil_wstrb,
-    input  wire                   s_axil_wvalid,
-    output wire                   s_axil_wready,
-    output wire [1:0]             s_axil_bresp,
-    output wire                   s_axil_bvalid,
-    input  wire                   s_axil_bready,
-    input  wire [ADDR_WIDTH-1:0]  s_axil_araddr,
-    input  wire [2:0]             s_axil_arprot,
-    input  wire                   s_axil_arvalid,
-    output wire                   s_axil_arready,
-    output wire [DATA_WIDTH-1:0]  s_axil_rdata,
-    output wire [1:0]             s_axil_rresp,
-    output wire                   s_axil_rvalid,
-    input  wire                   s_axil_rready,
+    input  logic [ADDR_WIDTH-1:0] s_axil_awaddr,
+    input  logic [2:0]            s_axil_awprot,
+    input  logic                  s_axil_awvalid,
+    output logic                  s_axil_awready,
+    input  logic [DATA_WIDTH-1:0] s_axil_wdata,
+    input  logic [STRB_WIDTH-1:0] s_axil_wstrb,
+    input  logic                  s_axil_wvalid,
+    output logic                  s_axil_wready,
+    output logic [1:0]            s_axil_bresp,
+    output logic                  s_axil_bvalid,
+    input  logic                  s_axil_bready,
+    input  logic [ADDR_WIDTH-1:0] s_axil_araddr,
+    input  logic [2:0]            s_axil_arprot,
+    input  logic                  s_axil_arvalid,
+    output logic                  s_axil_arready,
+    output logic [DATA_WIDTH-1:0] s_axil_rdata,
+    output logic [1:0]            s_axil_rresp,
+    output logic                  s_axil_rvalid,
+    input  logic                  s_axil_rready,
 
-    output wire                       enable,
-    output wire [EdgeCountWidth-1:0]  mul,
-    output wire [WindowSizeWidth-1:0] div,
-    input  wire                       lock,
-    input  wire [NumTuneBits-1:0]     tune
+    output logic                              enable,
+    output logic [EdgeCountWidth-1:0]         ref_mul,
+    output logic [WindowSizeWidth-1:0]        ref_div,
+    output logic [PostDividerDivideWidth-1:0] post_div,
+    input  logic                              lock,
+    input  logic [NumTuneBits-1:0]            tune
 );
 
-localparam int unsigned AddrLsb = $clog2(STRB_WIDTH);   // byte-within-word address bits
+localparam int unsigned AddrLsb   = $clog2(STRB_WIDTH);   // byte-within-word address bits
+localparam int unsigned RegIndexW = 3;                    // 5 registers -> 3-bit word index
 
-// mul/div are each written from one DATA_WIDTH register, so their fields must fit in it.
-if (EdgeCountWidth  > DATA_WIDTH) $error("EdgeCountWidth exceeds DATA_WIDTH");
-if (WindowSizeWidth > DATA_WIDTH) $error("WindowSizeWidth exceeds DATA_WIDTH");
+// each field is written from one DATA_WIDTH register, so it must fit in it.
+if (EdgeCountWidth         > DATA_WIDTH) $error("EdgeCountWidth exceeds DATA_WIDTH");
+if (WindowSizeWidth        > DATA_WIDTH) $error("WindowSizeWidth exceeds DATA_WIDTH");
+if (PostDividerDivideWidth > DATA_WIDTH) $error("PostDividerDivideWidth exceeds DATA_WIDTH");
 
-logic                       ctrl_d, ctrl_q;   // CTRL[0] = enable
-logic [EdgeCountWidth-1:0]  mul_d, mul_q;
-logic [WindowSizeWidth-1:0] div_d, div_q;
+logic                              ctrl_d, ctrl_q;   // CTRL[0] = enable
+logic [EdgeCountWidth-1:0]         ref_mul_d, ref_mul_q;
+logic [WindowSizeWidth-1:0]        ref_div_d, ref_div_q;
+logic [PostDividerDivideWidth-1:0] post_div_d, post_div_q;
 
 // ---- write channel ----
-logic       bvalid_d, bvalid_q;
-wire        write_accept = s_axil_awvalid && s_axil_wvalid && (!bvalid_q || s_axil_bready);
-wire [1:0]  write_index  = s_axil_awaddr[AddrLsb +: 2];
+logic                  bvalid_d, bvalid_q;
+wire                   write_accept = s_axil_awvalid && s_axil_wvalid && (!bvalid_q || s_axil_bready);
+wire [RegIndexW-1:0]   write_index  = s_axil_awaddr[AddrLsb +: RegIndexW];
 
 always_comb begin
     bvalid_d = bvalid_q;
@@ -105,30 +109,34 @@ always_comb begin
 end
 
 always_comb begin
-    ctrl_d = ctrl_q;
-    mul_d  = mul_q;
-    div_d  = div_q;
+    ctrl_d     = ctrl_q;
+    ref_mul_d  = ref_mul_q;
+    ref_div_d  = ref_div_q;
+    post_div_d = post_div_q;
     if (write_accept && s_axil_wstrb[0]) begin
         case (write_index)
-            2'd0: ctrl_d = s_axil_wdata[0];
-            2'd1: mul_d  = s_axil_wdata[EdgeCountWidth-1:0];
-            2'd2: div_d  = s_axil_wdata[WindowSizeWidth-1:0];
-            default: ;   // STATUS is read-only
+            3'd0: ctrl_d     = s_axil_wdata[0];
+            3'd1: ref_mul_d  = s_axil_wdata[EdgeCountWidth-1:0];
+            3'd2: ref_div_d  = s_axil_wdata[WindowSizeWidth-1:0];
+            3'd4: post_div_d = s_axil_wdata[PostDividerDivideWidth-1:0];
+            default: ;   // 3'd3 STATUS is read-only
         endcase
     end
 end
 
 always_ff @(posedge clk) begin
     if (rst) begin
-        bvalid_q <= 1'b0;
-        ctrl_q   <= 1'b0;
-        mul_q    <= '0;
-        div_q    <= '0;
+        bvalid_q   <= 1'b0;
+        ctrl_q     <= 1'b0;
+        ref_mul_q  <= '0;
+        ref_div_q  <= '0;
+        post_div_q <= 1'b1;   // ÷1 passthrough out of reset
     end else begin
-        bvalid_q <= bvalid_d;
-        ctrl_q   <= ctrl_d;
-        mul_q    <= mul_d;
-        div_q    <= div_d;
+        bvalid_q   <= bvalid_d;
+        ctrl_q     <= ctrl_d;
+        ref_mul_q  <= ref_mul_d;
+        ref_div_q  <= ref_div_d;
+        post_div_q <= post_div_d;
     end
 end
 
@@ -138,10 +146,10 @@ assign s_axil_bvalid  = bvalid_q;
 assign s_axil_bresp   = 2'b00;
 
 // ---- read channel ----
-logic              rvalid_d, rvalid_q;
+logic                 rvalid_d, rvalid_q;
 logic [DATA_WIDTH-1:0] rdata_d, rdata_q;
-wire               read_accept = s_axil_arvalid && (!rvalid_q || s_axil_rready);
-wire [1:0]         read_index  = s_axil_araddr[AddrLsb +: 2];
+wire                  read_accept = s_axil_arvalid && (!rvalid_q || s_axil_rready);
+wire [RegIndexW-1:0]  read_index  = s_axil_araddr[AddrLsb +: RegIndexW];
 
 wire [DATA_WIDTH-1:0] status_word = {{(DATA_WIDTH-1-NumTuneBits){1'b0}}, tune, lock};
 
@@ -155,10 +163,11 @@ always_comb begin
     rdata_d = rdata_q;
     if (read_accept) begin
         case (read_index)
-            2'd0:    rdata_d = {{(DATA_WIDTH-1){1'b0}}, ctrl_q};
-            2'd1:    rdata_d = {{(DATA_WIDTH-EdgeCountWidth){1'b0}}, mul_q};
-            2'd2:    rdata_d = {{(DATA_WIDTH-WindowSizeWidth){1'b0}}, div_q};
-            default: rdata_d = status_word;
+            3'd0:    rdata_d = {{(DATA_WIDTH-1){1'b0}}, ctrl_q};
+            3'd1:    rdata_d = {{(DATA_WIDTH-EdgeCountWidth){1'b0}}, ref_mul_q};
+            3'd2:    rdata_d = {{(DATA_WIDTH-WindowSizeWidth){1'b0}}, ref_div_q};
+            3'd4:    rdata_d = {{(DATA_WIDTH-PostDividerDivideWidth){1'b0}}, post_div_q};
+            default: rdata_d = status_word;   // 3'd3 STATUS
         endcase
     end
 end
@@ -178,8 +187,9 @@ assign s_axil_rdata   = rdata_q;
 assign s_axil_rvalid  = rvalid_q;
 assign s_axil_rresp   = 2'b00;
 
-assign enable = ctrl_q;
-assign mul    = mul_q;
-assign div    = div_q;
+assign enable   = ctrl_q;
+assign ref_mul  = ref_mul_q;
+assign ref_div  = ref_div_q;
+assign post_div = post_div_q;
 
 endmodule

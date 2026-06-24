@@ -48,9 +48,9 @@ module adpll_cell_nand2 #(
     parameter string   Target          = "behavioral",
     parameter realtime BehavioralDelay = 0.1ns
 ) (
-    input  wire A,
-    input  wire B,
-    output wire Y
+    input  logic A,
+    input  logic B,
+    output logic Y
 );
 
 if (Target == "gf180mcu_as_sc_mcu7t3v3") begin : gf180mcu_as_sc_mcu7t3v3
@@ -63,7 +63,7 @@ if (Target == "gf180mcu_as_sc_mcu7t3v3") begin : gf180mcu_as_sc_mcu7t3v3
 end else if (Target == "behavioral") begin : behavioral
     assign #(BehavioralDelay) Y = ~(A & B);
 end else begin : invalid
-    initial $fatal(1, "adpll_cell_nand2: unsupported Target \"%s\"", Target);
+    initial $fatal(1, "Unsupported Target \"%s\"", Target);
 end
 
 endmodule

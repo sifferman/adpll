@@ -17,8 +17,8 @@ on:
       dco:
         description: "ring_dco variant to characterise"
         default: ring_dco_binary
-      sweep:
-        description: "comma-separated tune codes"
+      dco_tune:
+        description: "comma-separated DCO tune codes"
         default: "0,8,16,32,64,96,127"
   push:
     paths:
@@ -55,14 +55,14 @@ jobs:
       - name: Harden ring_dco + ngspice tune sweep
         env:
           DCO: ${{ github.event.inputs.dco || 'ring_dco_binary' }}
-          SWEEP: ${{ github.event.inputs.sweep || '0,8,16,32,64,96,127' }}
+          DCO_TUNE: ${{ github.event.inputs.dco_tune || '0,8,16,32,64,96,127' }}
         run: |
           nix develop --accept-flake-config --command bash -ceu '
             ciel enable 019cf7a3e0de79bb0e4b6213758882d283c65816 \
               --pdk-root "$PWD/.pdk" --pdk-family gf180mcuD --include-libraries all
             make dco-spice \
               PDK_ROOT="$PWD/.pdk" PDK=gf180mcuD SCL=gf180mcu_as_sc_mcu7t3v3 NGSPICE=ngspice \
-              DCO="$DCO" SWEEP="$SWEEP"
+              DCO="$DCO" DCO_TUNE="$DCO_TUNE"
           '
           # the verbose harden log is in this step above; dco_freq.txt holds just the freq table
 

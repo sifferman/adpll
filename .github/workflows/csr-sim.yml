@@ -1,0 +1,32 @@
+# s_axi_adpll_csr logic verification -- the ONLY block simulated in a logic simulator (the detector /
+# filter / lock / DCO are analog and signed off in SPICE: see dco-spice.yml / adpll-spice.yml).
+# Fast: just iverilog + cocotb + cocotbext-axi driving the AXI4-Lite register file, so it runs on push.
+
+name: CSR sim
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'rtl/axi/s_axi_adpll_csr.sv'
+      - 'sim/test_adpll_csr.py'
+      - '.github/workflows/csr-sim.yml'
+
+jobs:
+  csr-sim:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install iverilog
+        run: sudo apt-get update && sudo apt-get install -y iverilog
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install cocotb + cocotbext-axi
+        run: pip install cocotb cocotbext-axi
+
+      - name: Run CSR cocotb test
+        run: cd sim && SIM=icarus python3 test_adpll_csr.py

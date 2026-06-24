@@ -49,9 +49,9 @@ module ring_dco_coarsefine #(
     parameter int unsigned NumFineBits = 3,
     parameter string       Target      = "behavioral"
 ) (
-    input  wire                   enable_i,
-    input  wire [NumTuneBits-1:0] tune_i,
-    output wire                   clk_o
+    input  logic                  enable_i,
+    input  logic[NumTuneBits-1:0] tune_i,
+    output logic                  clk_o
 );
 
 if (NumFineBits >= NumTuneBits)

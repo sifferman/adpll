@@ -45,9 +45,9 @@ module ring_dco_thermometer #(
     parameter int unsigned NumTuneBits = 7,
     parameter string       Target      = "behavioral"
 ) (
-    input  wire                   enable_i,
-    input  wire [NumTuneBits-1:0] tune_i,
-    output wire                   clk_o
+    input  logic                  enable_i,
+    input  logic[NumTuneBits-1:0] tune_i,
+    output logic                  clk_o
 );
 
 localparam int unsigned NumUnits = (1 << NumTuneBits) - 1;

@@ -53,15 +53,15 @@ module adpll_phase_detector #(
     parameter  int unsigned PhaseWidth        = 6,
     parameter  int unsigned ErrorWidth        = 24
 ) (
-    input  wire                  clk_i,
-    input  wire                  rst_ni,
-    input  wire                  enable_i,
-    input  wire [FcwWidth-1:0]   fcw_i,
-    input  wire                  dco_clk_i,
-    input  wire [PhaseWidth-1:0] tdc_phase_i,
+    input  logic                 clk_i,
+    input  logic                 rst_ni,
+    input  logic                 enable_i,
+    input  logic[FcwWidth-1:0]   fcw_i,
+    input  logic                 dco_clk_i,
+    input  logic[PhaseWidth-1:0] tdc_phase_i,
 
-    output wire signed [ErrorWidth-1:0] error_o,
-    output wire                         valid_o
+    output logic signed [ErrorWidth-1:0] error_o,
+    output logic                        valid_o
 );
 
 // Edges per single reference cycle (1-cycle measurement window), accumulated into the DCO phase.

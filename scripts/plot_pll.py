@@ -24,7 +24,7 @@ CORNER_ORDER = ["ss", "typical", "ff"]
 CORNER_LABEL = {
     "ss": "SS  (ss / 3.0 V / 125 °C)",
     "typical": "TT  (typ / 3.3 V / 25 °C)",
-    "ff": "FF  (ff / 3.6 V / −40 °C)",
+    "ff": "FF  (ff / 3.6 V / -40 °C)",
 }
 CORNER_COLOR = {"ss": "#1b9e77", "typical": "#7570b3", "ff": "#d95f02"}
 

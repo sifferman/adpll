@@ -52,12 +52,8 @@ sim-adpll-phase: ## Phase-domain ADPLL (TDC + reference/variable phase accumulat
 		rtl/loop_filter/adpll_loop_filter_pi.sv sim/ring_dco_behavioral.sv sim/tb_adpll_phase.v
 	vvp sim_build/tb_adpll_phase | grep -E "LOCKED|PASS|FAIL"
 
-sim-adpll-csr: ## Single-PLL CSR: program mul/div/enable over AXI4-Lite, poll STATUS for lock
-	@mkdir -p sim_build
-	iverilog -g2012 -o sim_build/tb_adpll_csr $(TS) \
-		rtl/axi/s_axi_adpll_csr.sv rtl/adpll_freq_detector.sv rtl/adpll_freq_counter.sv rtl/adpll_lock_detector.sv \
-		rtl/loop_filter/adpll_loop_filter_bangbang.sv sim/ring_dco_behavioral.sv sim/tb_adpll_csr.v
-	vvp sim_build/tb_adpll_csr | grep -E "CSR programmed|LOCKED|PASS|FAIL"
+sim-adpll-csr: ## CSR (s_axi_adpll_csr) AXI4-Lite unit test -- cocotb + cocotbext-axi (pip install cocotb cocotbext-axi)
+	cd sim && SIM=icarus python3 test_adpll_csr.py
 
 # ---- DCO SPICE characterisation (needs LibreLane + a gf180 PDK + ngspice >= 42) ----
 # Harden one ring_dco_<DCO> as a standalone macro (librelane/ring_dco.yaml), then sweep its tune
@@ -68,7 +64,10 @@ PDK         ?= gf180mcuD
 PDK_ROOT    ?= $(HOME)/.ciel
 SCL         ?= gf180mcu_as_sc_mcu7t3v3
 DCO         ?= ring_dco_binary
-SWEEP       ?= 0,8,16,32,64,96,127
+DCO_TUNE    ?= 0,8,16,32,64,96,127
+ADPLL       ?= adpll_bangbang_binary
+REF_MHZ     ?= 200
+RATIOS      ?= 8/8,10/8,12/8,14/8
 NGSPICE     ?= ngspice
 PDK_NGSPICE ?= $(shell find $(PDK_ROOT) -type d -path '*/$(PDK)/libs.tech/ngspice' 2>/dev/null | head -1)
 .PHONY: dco-spice
@@ -78,8 +77,18 @@ dco-spice: ## Harden a ring_dco macro + ngspice tune sweep (freq-vs-code). Needs
 	librelane librelane/ring_dco.yaml --pdk $(PDK) --pdk-root $(PDK_ROOT) --scl $(SCL) -c DESIGN_NAME=$(DCO)
 	python3 librelane/dco_freq.py \
 		--extracted $$(ls -td librelane/runs/*/final/spice/$(DCO).spice | head -1) \
-		--pdk-ngspice $(PDK_NGSPICE) --ngspice $(NGSPICE) --design $(DCO) --bits 7 --sweep $(SWEEP) \
+		--pdk-ngspice $(PDK_NGSPICE) --ngspice $(NGSPICE) --design $(DCO) --bits 7 --dco-tune $(DCO_TUNE) \
 		--out dco_freq.txt
+
+.PHONY: adpll-spice
+adpll-spice: ## Harden a (shrunk) full adpll + closed-loop ngspice until lock (time-to-lock + locked freq).
+	@test -n "$(PDK_NGSPICE)" || { echo "ERROR: PDK_NGSPICE empty -- no '*/$(PDK)/libs.tech/ngspice' under PDK_ROOT=$(PDK_ROOT). Is the PDK enabled?"; exit 1; }
+	@echo "PDK_NGSPICE = $(PDK_NGSPICE)"
+	librelane librelane/adpll.yaml --pdk $(PDK) --pdk-root $(PDK_ROOT) --scl $(SCL) -c DESIGN_NAME=$(ADPLL)
+	python3 librelane/adpll_lock.py \
+		--extracted $$(ls -td librelane/runs/*/final/spice/$(ADPLL).spice | head -1) \
+		--pdk-ngspice $(PDK_NGSPICE) --ngspice $(NGSPICE) --design $(ADPLL) \
+		--ref-mhz $(REF_MHZ) --ratios $(RATIOS) --out adpll_lock.txt
 
 clean: ## Remove sim build artifacts
 	rm -rf sim_build

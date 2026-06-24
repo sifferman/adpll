@@ -9,7 +9,7 @@
 #
 #   ./dco_freq.py --extracted runs/*/final/spice/ring_dco_binary.spice \
 #       --pdk-ngspice <pdk>/libs.tech/ngspice --ngspice ngspice \
-#       --bits 7 --sweep 0,8,16,32,64,127
+#       --bits 7 --dco-tune 0,8,16,32,64,127
 
 import argparse, os, re, subprocess, sys
 
@@ -76,7 +76,8 @@ def main():
     ap.add_argument("--design", default="ring_dco_binary")
     ap.add_argument("--ngspice", default="ngspice")
     ap.add_argument("--bits", type=int, default=7)
-    ap.add_argument("--sweep", default="0,8,16,32,64,127")
+    ap.add_argument("--dco-tune", default="0,8,16,32,64,127",
+                    help="comma list of DCO tune codes to sweep")
     ap.add_argument("--corner", default="typical")
     ap.add_argument("--vdd", type=float, default=3.3)
     ap.add_argument("--temp", type=float, default=25.0)
@@ -98,7 +99,7 @@ def main():
     ports = subckt_ports(a.extracted, a.design)
     if not ports:
         sys.exit(f"could not find .subckt {a.design} in {a.extracted}")
-    codes = [int(c) for c in a.sweep.split(",")]
+    codes = [int(c) for c in a.dco_tune.split(",")]
 
     rows = [f"# {a.design}  corner={a.corner} vdd={a.vdd} temp={a.temp}  (ports: {' '.join(ports)})",
             f"# {'code':>5}  {'freq_MHz':>10}  {'period_ns':>10}"]

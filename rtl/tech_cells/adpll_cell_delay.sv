@@ -50,8 +50,8 @@ module adpll_cell_delay #(
     parameter string   Target          = "behavioral",
     parameter realtime BehavioralDelay = 0.1ns
 ) (
-    input  wire A,
-    output wire Y
+    input  logic A,
+    output logic Y
 );
 
 if (Target == "gf180mcu_as_sc_mcu7t3v3") begin : gf180mcu_as_sc_mcu7t3v3
@@ -63,7 +63,7 @@ if (Target == "gf180mcu_as_sc_mcu7t3v3") begin : gf180mcu_as_sc_mcu7t3v3
 end else if (Target == "behavioral") begin : behavioral
     assign #(BehavioralDelay) Y = A;
 end else begin : invalid
-    initial $fatal(1, "adpll_cell_delay: unsupported Target \"%s\"", Target);
+    initial $fatal(1, "Unsupported Target \"%s\"", Target);
 end
 
 endmodule

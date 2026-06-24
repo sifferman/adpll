@@ -36,10 +36,11 @@
 //
 // Ports:
 //   - clk_i, rst_ni, enable_i : run + program
-//   - mul_i, div_i   : synthesizer ratio N / M (set over the CSR)
+//   - ref_mul_i, ref_div_i, post_div_i : synthesizer ratio N / M and output divide K (set over the CSR)
+//   - clk_o            : synthesized output clock = F_DCO / K
 //   - lock_o           : status (lock flag)
 //   - debug_dco_tune_o : internal DCO tune code, debug observation only
-//   - dco_clk_o      : raw DCO clock, brought out for observation
+//   - debug_dco_clk_o  : raw DCO clock, debug observation only
 
 module adpll_bangbang_muxtap #(
     parameter  int unsigned DcoNumTuneBits                = 7,
@@ -47,18 +48,23 @@ module adpll_bangbang_muxtap #(
     parameter  int unsigned FreqDetectorMaxWindowSize     = (1 << 16) - 1,
     parameter  int unsigned LockMinSamplesForLock         = 8,
     parameter  int unsigned LockBandRadius                = 1,
+    parameter  int unsigned PostDividerMaxDivide          = 255,
     localparam int unsigned FreqDetectorWindowSizeWidth   = $clog2(FreqDetectorMaxWindowSize + 1),
-    localparam int unsigned LoopFilterErrorWidth          = $clog2(FreqDetectorMaxEdgesPerWindow + 1) + 2
+    localparam int unsigned LoopFilterErrorWidth          = $clog2(FreqDetectorMaxEdgesPerWindow + 1) + 2,
+    localparam int unsigned PostDividerDivideWidth        = $clog2(PostDividerMaxDivide + 1)
 ) (
-    input  wire                                               clk_i,
-    input  wire                                               rst_ni,
-    input  wire                                               enable_i,
-    input  wire [$clog2(FreqDetectorMaxEdgesPerWindow+1)-1:0] mul_i,  // target edge count N (set over CSR)
-    input  wire [FreqDetectorWindowSizeWidth-1:0]             div_i,  // window length M, ref cycles (CSR)
+    input  logic                                              clk_i,
+    input  logic                                              rst_ni,
+    input  logic                                              enable_i,
+    input  logic[$clog2(FreqDetectorMaxEdgesPerWindow+1)-1:0] ref_mul_i,  // target edge count N (set over CSR)
+    input  logic[FreqDetectorWindowSizeWidth-1:0]             ref_div_i,  // window length M, ref cycles (CSR)
+    input  logic[PostDividerDivideWidth-1:0]                  post_div_i,  // output divide K (set over CSR)
 
-    output wire                                               lock_o,
-    output wire [DcoNumTuneBits-1:0]                          debug_dco_tune_o,  // internal tune, debug only
-    output wire                                               dco_clk_o          // raw DCO oscillation
+    output logic                                              clk_o,             // synthesized output = F_DCO / K
+    output logic                                              lock_o,
+
+    output logic[DcoNumTuneBits-1:0]                          debug_dco_tune_o,  // internal tune, debug only
+    output logic                                              debug_dco_clk_o    // raw DCO oscillation, debug
 );
 
 
@@ -68,7 +74,7 @@ wire [DcoNumTuneBits-1:0]              tune;
 wire [DcoNumTuneBits-1:0]              lock_sample;
 wire                                   dco_clk;
 
-// detector: DCO edges over a div_i window vs mul_i -> signed frequency error
+// detector: DCO edges over a ref_div_i window vs ref_mul_i -> signed frequency error
 adpll_freq_detector #(
     .MaxEdgesPerWindow(FreqDetectorMaxEdgesPerWindow),
     .MaxWindowSize    (FreqDetectorMaxWindowSize)
@@ -76,8 +82,8 @@ adpll_freq_detector #(
     .clk_i          (clk_i),
     .rst_ni         (rst_ni),
     .enable_i       (enable_i),
-    .target_i       (mul_i),
-    .window_length_i(div_i),
+    .target_i       (ref_mul_i),
+    .window_length_i(ref_div_i),
     .dco_clk_i      (dco_clk),
     .error_o        (error),
     .valid_o        (valid)
@@ -120,7 +126,17 @@ ring_dco_muxtap #(
     .clk_o   (dco_clk)
 );
 
+adpll_post_divider #(
+    .DivideWidth(PostDividerDivideWidth)
+) adpll_post_divider (
+    .clk_i   (dco_clk),
+    .rst_ni  (rst_ni),
+    .enable_i(enable_i),
+    .divide_i(post_div_i),
+    .clk_o   (clk_o)
+);
+
 assign debug_dco_tune_o = tune;
-assign dco_clk_o        = dco_clk;
+assign debug_dco_clk_o  = dco_clk;
 
 endmodule

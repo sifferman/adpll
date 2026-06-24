@@ -13,7 +13,7 @@ meta:
   version: 2
   flow: Classic
 
-DESIGN_NAME: adpll_gearshift_binary
+DESIGN_NAME: adpll_bangbang_binary
 
 VERILOG_FILES:
 - dir::../rtl/tech_cells/adpll_cell_nand2.sv
@@ -43,10 +43,22 @@ VERILOG_FILES:
 - dir::../rtl/adpll/adpll_gearshift_muxtap.sv
 - dir::../rtl/adpll/adpll_gearshift_coarsefine.sv
 
-# The adpll config hardcodes Target="gf180mcu_as_sc_mcu7t3v3" into its ring, so no -G is needed.
-# The gf180 std cells resolve from the SCL liberty (unknown-as-blackbox to slang).
+# The adpll config hardcodes Target="gf180mcu_as_sc_mcu7t3v3" into its ring (no -G Target needed); the
+# gf180 std cells resolve from the SCL liberty (unknown-as-blackbox to slang). We DO shrink the config
+# via -G: a closed-loop transistor-level ngspice run to lock must finish in feasible wall-clock, so we
+# cut the tune code to 4 bits and the counter/window to a handful of cycles (the loop logic is identical
+# to the full-rate config -- only the widths shrink, so lock takes ~tens of windows, ~1 us, not ms).
 USE_SLANG: true
-SLANG_ARGUMENTS: ['--ignore-unknown-modules']
+SLANG_ARGUMENTS:
+- '--ignore-unknown-modules'
+- '-G'
+- 'DcoNumTuneBits=4'
+- '-G'
+- 'FreqDetectorMaxEdgesPerWindow=63'
+- '-G'
+- 'FreqDetectorMaxWindowSize=15'
+- '-G'
+- 'LockMinSamplesForLock=3'
 
 # Real reference clock (drives the detector/filter/lock). The DCO ring is a kept combinational
 # loop; don't let timing-repair fight it.

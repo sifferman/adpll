@@ -50,15 +50,15 @@ module adpll_freq_counter #(
     parameter  int unsigned MaxWindowSize     = (1 << 16) - 1,
     localparam int unsigned WindowSizeWidth   = $clog2(MaxWindowSize + 1)
 ) (
-    input  wire                       clk_i,
-    input  wire                       rst_ni,
+    input  logic                      clk_i,
+    input  logic                      rst_ni,
 
-    input  wire                       enable_i,
-    input  wire [WindowSizeWidth-1:0] window_length_i,   // measurement window length, in clk_i cycles
-    input  wire                       dco_clk_i,
+    input  logic                      enable_i,
+    input  logic[WindowSizeWidth-1:0] window_length_i,   // measurement window length, in clk_i cycles
+    input  logic                      dco_clk_i,
 
-    output wire [EdgeCountWidth-1:0]  dco_edge_count_o,  // DCO edges in the last completed window
-    output wire                       sample_valid_o
+    output logic[EdgeCountWidth-1:0]  dco_edge_count_o,  // DCO edges in the last completed window
+    output logic                      sample_valid_o
 );
 
 // ================================================================ //
