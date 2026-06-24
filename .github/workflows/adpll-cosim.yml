@@ -14,6 +14,8 @@ name: ADPLL cosim (experimental)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 
 jobs:
   cosim:
@@ -34,7 +36,11 @@ jobs:
           - adpll_gearshift_thermometer
           - adpll_gearshift_muxtap
           - adpll_gearshift_coarsefine
-        corner: [typical, ss, ff]
+          - adpll_phase_proportionalintegral_binary
+          - adpll_phase_proportionalintegral_thermometer
+          - adpll_phase_proportionalintegral_muxtap
+          - adpll_phase_proportionalintegral_coarsefine
+        corner: [typical]
     steps:
       - name: Maximize build space
         uses: AdityaGarg8/remove-unwanted-software@v5

@@ -76,9 +76,9 @@ TB_TEMPLATE_PHASE = """\
 .include tdc.spice
 .temp 25
 * Trade accuracy for speed: the 63-tap TDC delay line switching at hundreds of MHz is the runtime
-* bottleneck. Looser tolerances let ngspice take bigger timesteps; the TDC phase is coarse (~2^PhaseWidth
-* levels) so it tolerates this. (FLL deck keeps the defaults -- it's already fast.)
-.options reltol=1e-2 abstol=1e-9 vntol=1e-4 trtol=20 gmin=1e-9
+* bottleneck. Looser tolerances + bigger timesteps + device bypass cut the cost; the TDC phase is
+* coarse (~2^PhaseWidth levels) so it tolerates this. (FLL deck keeps the defaults -- already fast.)
+.options reltol=1e-2 abstol=1e-8 vntol=1e-3 chgtol=1e-12 trtol=50 bypass=1 gmin=1e-9 itl4=200 maxord=2
 Vdd VDD 0 {vdd}
 Vss VSS 0 0
 

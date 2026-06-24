@@ -45,8 +45,8 @@ ifeq ($(IS_PHASE),1)
   FILTER   := $(word 3,$(subst _, ,$(ADPLL)))
   DCONAME  := $(word 4,$(subst _, ,$(ADPLL)))
   DETECTOR := adpll_phase_detector
-  REF_MHZ  ?= 25
-  TSTOP    ?= 2000
+  REF_MHZ  ?= 50
+  TSTOP    ?= 1200
 else
   FILTER   := $(word 2,$(subst _, ,$(ADPLL)))
   DCONAME  := $(word 3,$(subst _, ,$(ADPLL)))
