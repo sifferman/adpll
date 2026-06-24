@@ -81,7 +81,7 @@ module adpll_phase_proportionalintegral_muxtap #(
 
 
 wire signed [PhaseDetectorErrorWidth-1:0] phase_error;
-wire                                      valid;
+wire                                      phase_error_valid;
 wire [DcoNumTuneBits-1:0] dco_tune;
 wire [DcoNumTuneBits-1:0] lock_detector_sample;
 wire [TdcPhaseWidth-1:0]                  tdc_phase;
@@ -112,7 +112,7 @@ adpll_phase_detector #(
     .dco_clk_i  (dco_clk),
     .tdc_phase_i(tdc_phase),
     .error_o    (phase_error),
-    .valid_o    (valid)
+    .valid_o    (phase_error_valid)
 );
 
 // type-II loop filter: maps the phase error to the DCO tune code
@@ -126,7 +126,7 @@ adpll_loop_filter_proportionalintegral #(
     .clk_i        (clk_i),
     .rst_ni       (rst_ni),
     .enable_i     (enable_i),
-    .valid_i      (valid),
+    .valid_i      (phase_error_valid),
     .error_i      (phase_error),
     .tune_o       (dco_tune),
     .lock_sample_o(lock_detector_sample)
@@ -141,7 +141,7 @@ adpll_lock_detector #(
     .clk_i          (clk_i),
     .rst_ni         (rst_ni),
     .enable_i       (enable_i),
-    .sample_valid_i (valid),
+    .sample_valid_i (phase_error_valid),
     .tuning_sample_i(lock_detector_sample),
     .lock_o         (lock_o)
 );

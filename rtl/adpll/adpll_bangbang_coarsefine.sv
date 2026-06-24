@@ -55,6 +55,7 @@ module adpll_bangbang_coarsefine #(
 ) (
     input  logic                                              clk_i,
     input  logic                                              rst_ni,
+
     input  logic                                              enable_i,
     input  logic[$clog2(FreqDetectorMaxEdgesPerWindow+1)-1:0] ref_mul_i,  // target edge count N (set over CSR)
     input  logic[FreqDetectorWindowSizeWidth-1:0]             ref_div_i,  // window length M, ref cycles (CSR)
@@ -68,8 +69,8 @@ module adpll_bangbang_coarsefine #(
 );
 
 
-wire signed [LoopFilterErrorWidth-1:0] error;
-wire                                   valid;
+wire signed [LoopFilterErrorWidth-1:0] loop_filter_error;
+wire                                   loop_filter_error_valid;
 wire [DcoNumTuneBits-1:0] dco_tune;
 wire [DcoNumTuneBits-1:0] lock_detector_sample;
 wire                                   dco_clk;
@@ -85,8 +86,8 @@ adpll_freq_detector #(
     .target_i       (ref_mul_i),
     .window_length_i(ref_div_i),
     .dco_clk_i      (dco_clk),
-    .error_o        (error),
-    .valid_o        (valid)
+    .error_o        (loop_filter_error),
+    .valid_o        (loop_filter_error_valid)
 );
 
 // loop filter: maps the frequency error to the DCO tune code
@@ -97,8 +98,8 @@ adpll_loop_filter_bangbang #(
     .clk_i        (clk_i),
     .rst_ni       (rst_ni),
     .enable_i     (enable_i),
-    .valid_i      (valid),
-    .error_i      (error),
+    .valid_i      (loop_filter_error_valid),
+    .error_i      (loop_filter_error),
     .tune_o       (dco_tune),
     .lock_sample_o(lock_detector_sample)
 );
@@ -112,7 +113,7 @@ adpll_lock_detector #(
     .clk_i          (clk_i),
     .rst_ni         (rst_ni),
     .enable_i       (enable_i),
-    .sample_valid_i (valid),
+    .sample_valid_i (loop_filter_error_valid),
     .tuning_sample_i(lock_detector_sample),
     .lock_o         (lock_o)
 );
