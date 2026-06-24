@@ -2,12 +2,12 @@
 # (Magic), and sweep the tune code through ngspice -> frequency-vs-code. This is the DCO sign-off
 # (the ring's frequency is physical, not RTL), driven straight from the .sv via the real flow.
 #
-# Heavy (~10-15 min: a full harden + a transient per code), so it runs on demand and only when the
+# Heavy (~15-25 min: a full harden + a transient per code), so it runs on demand and only when the
 # DCO / tech cells / harden config change -- not on every push.
 #
-# The LibreLane container bundles the toolchain (librelane, openroad, magic, yosys, ngspice, ciel);
-# we ciel-enable the pinned gf180 PDK and call `make dco-spice` (which auto-locates the PDK SPICE
-# models under PDK_ROOT, so the ciel layout doesn't matter).
+# The toolchain (librelane + openroad + magic + yosys + ciel + ngspice + make) comes from the Nix
+# flake (devshell), pulled prebuilt from the fossi-foundation cache. We ciel-enable the pinned
+# gf180 PDK and call `make dco-spice` (which auto-locates the PDK SPICE models under PDK_ROOT).
 
 name: DCO SPICE
 
@@ -26,28 +26,35 @@ on:
       - 'rtl/tech_cells/**'
       - 'librelane/**'
       - 'Makefile'
+      - 'flake.nix'
       - '.github/workflows/dco-spice.yml'
 
 jobs:
   dco-spice:
     runs-on: ubuntu-24.04
-    container:
-      image: ghcr.io/librelane/librelane:latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Enable the gf180 PDK (pinned)
-        run: |
-          ciel enable 019cf7a3e0de79bb0e4b6213758882d283c65816 \
-            --pdk-root "$PWD/.pdk" --pdk-family gf180mcuD --include-libraries all
+      - name: Setup Nix
+        uses: DeterminateSystems/nix-installer-action@main
+        with:
+          determinate: false
+          extra-conf: |
+            extra-substituters = https://nix-cache.fossi-foundation.org
+            extra-trusted-public-keys = nix-cache.fossi-foundation.org:3+K59iFwXqKsL7BNu6Guy0v+uTlwsxYQxjspXzqLYQs=
 
       - name: Harden ring_dco + ngspice tune sweep
+        env:
+          DCO: ${{ github.event.inputs.dco || 'ring_dco_binary' }}
+          SWEEP: ${{ github.event.inputs.sweep || '0,8,16,32,64,96,127' }}
         run: |
-          make dco-spice \
-            PDK_ROOT="$PWD/.pdk" PDK=gf180mcuD SCL=gf180mcu_as_sc_mcu7t3v3 NGSPICE=ngspice \
-            DCO="${{ github.event.inputs.dco || 'ring_dco_binary' }}" \
-            SWEEP="${{ github.event.inputs.sweep || '0,8,16,32,64,96,127' }}" \
-            | tee dco_freq.txt
+          nix develop --accept-flake-config --command bash -ceu '
+            ciel enable 019cf7a3e0de79bb0e4b6213758882d283c65816 \
+              --pdk-root "$PWD/.pdk" --pdk-family gf180mcuD --include-libraries all
+            make dco-spice \
+              PDK_ROOT="$PWD/.pdk" PDK=gf180mcuD SCL=gf180mcu_as_sc_mcu7t3v3 NGSPICE=ngspice \
+              DCO="$DCO" SWEEP="$SWEEP" | tee dco_freq.txt
+          '
 
       - name: Report freq-vs-code
         if: always()

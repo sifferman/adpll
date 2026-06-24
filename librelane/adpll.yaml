@@ -1,0 +1,63 @@
+# LibreLane Classic-flow config to harden ONE full adpll_<filter>_<dco> configuration as a macro,
+# so its extracted (parasitic) netlist can be closed-loop simulated in ngspice: program mul/div,
+# kick enable, and run a transient until lock_o -- measuring time-to-lock, the locked DCO frequency,
+# and the tune trajectory. Unlike the bare ring (librelane/ring_dco.yaml), a full adpll HAS a real
+# reference clock (clk_i) driving the detector/filter/lock, so CTS and timing run normally; only the
+# DCO ring inside stays a kept combinational loop.
+#
+#   nix develop -c librelane third_party/adpll/librelane/adpll.yaml \
+#       --pdk gf180mcuD --pdk-root <root> --scl gf180mcu_as_sc_mcu7t3v3 \
+#       -c DESIGN_NAME=adpll_gearshift_binary
+
+meta:
+  version: 2
+  flow: Classic
+
+DESIGN_NAME: adpll_gearshift_binary
+
+VERILOG_FILES:
+- dir::../rtl/tech_cells/adpll_cell_nand2.sv
+- dir::../rtl/tech_cells/adpll_cell_inv.sv
+- dir::../rtl/tech_cells/adpll_cell_mux2.sv
+- dir::../rtl/tech_cells/adpll_cell_delay.sv
+- dir::../rtl/adpll_freq_counter.sv
+- dir::../rtl/adpll_freq_detector.sv
+- dir::../rtl/adpll_lock_detector.sv
+- dir::../rtl/loop_filter/adpll_loop_filter_bangbang.sv
+- dir::../rtl/loop_filter/adpll_loop_filter_pi.sv
+- dir::../rtl/loop_filter/adpll_loop_filter_gearshift.sv
+- dir::../rtl/dco/ring_dco_binary.sv
+- dir::../rtl/dco/ring_dco_thermometer.sv
+- dir::../rtl/dco/ring_dco_muxtap.sv
+- dir::../rtl/dco/ring_dco_coarsefine.sv
+- dir::../rtl/adpll/adpll_bangbang_binary.sv
+- dir::../rtl/adpll/adpll_bangbang_thermometer.sv
+- dir::../rtl/adpll/adpll_bangbang_muxtap.sv
+- dir::../rtl/adpll/adpll_bangbang_coarsefine.sv
+- dir::../rtl/adpll/adpll_linear_binary.sv
+- dir::../rtl/adpll/adpll_linear_thermometer.sv
+- dir::../rtl/adpll/adpll_linear_muxtap.sv
+- dir::../rtl/adpll/adpll_linear_coarsefine.sv
+- dir::../rtl/adpll/adpll_gearshift_binary.sv
+- dir::../rtl/adpll/adpll_gearshift_thermometer.sv
+- dir::../rtl/adpll/adpll_gearshift_muxtap.sv
+- dir::../rtl/adpll/adpll_gearshift_coarsefine.sv
+
+# The adpll config hardcodes Target="gf180mcu_as_sc_mcu7t3v3" into its ring, so no -G is needed.
+# The gf180 std cells resolve from the SCL liberty (unknown-as-blackbox to slang).
+USE_SLANG: true
+SLANG_ARGUMENTS: ['--ignore-unknown-modules']
+
+# Real reference clock (drives the detector/filter/lock). The DCO ring is a kept combinational
+# loop; don't let timing-repair fight it.
+CLOCK_PORT: clk_i
+CLOCK_PERIOD: 20          # 50 MHz reference
+RUN_POST_GRT_RESIZER_TIMING: false
+
+# Utilisation-based auto floorplan (the full adpll is ~1k cells: counter + filter + lock + ring).
+FP_CORE_UTIL: 35
+PL_TARGET_DENSITY_PCT: 45
+
+# Magic SPICE extraction (the netlist fed to ngspice).
+MAGIC_EXT_USE_GDS: true
+RUN_MAGIC_STREAMOUT: true
