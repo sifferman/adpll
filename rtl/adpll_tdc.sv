@@ -31,9 +31,9 @@
 // the DCO phase within the current cycle as an unsigned fixed-point angle: the range [0, 2*pi) is
 // encoded across the full PhaseWidth-bit output, all-zeros = 0 and all-ones = just below 2*pi. The
 // integer DCO phase is the edge count; this sub-cycle angle is what gives the loop its resolution.
-// SYNTHESIS = a flash delay line of adpll_delay_cell taps sampled by reference-clocked flops,
+// SYNTHESIS = a flash delay line of adpll_cell_delay taps sampled by reference-clocked flops,
 // then a thermometer popcount; else a behavioural model reading the elapsed time directly.
-// The only PDK-specific piece is adpll_delay_cell (the delay tap); the samplers are plain flops.
+// The only PDK-specific piece is adpll_cell_delay (the delay tap); the samplers are plain flops.
 //
 // Parameters:
 //   - PhaseWidth : phase resolution in bits; codes 0..2^PhaseWidth-1 span one cycle [0, 2*pi).
@@ -65,7 +65,7 @@ localparam int unsigned NumTaps = (1 << PhaseWidth) - 1;
 wire [NumTaps:0] tap;
 assign tap[0] = dco_clk_i;
 for (genvar i_GEN = 0; i_GEN < NumTaps; i_GEN++) begin : delay_line
-    adpll_delay_cell u_dly (
+    adpll_cell_delay u_dly (
         .a (tap[i_GEN]),
         .z (tap[i_GEN + 1])
     );

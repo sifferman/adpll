@@ -24,35 +24,35 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-// adpll_delay_cell
+// adpll_cell_nand
 //
-// One buffer-delay element, the only PDK-specific cell in the ADPLL: it is the unit tap of the
-// TDC delay line, where the delay must be a real physical buffer (it cannot be inferred -- a
-// synthesis tool would optimise a plain buffer away, and RTL has no notion of absolute delay).
-// PORT IT by replacing the cell instantiation below with your PDK's smallest delay buffer; keep
-// the (* keep *)/(* dont_touch *) so the optimiser preserves it. The LSB time is that cell's
-// delay, characterised in SPICE.
+// 2-input NAND (y = ~(a & b)). In the ring DCOs this is the gating gate: it injects enable_i and
+// supplies the single inversion that sustains oscillation (b = ring feedback). One of the
+// PDK-specific primitives in `rtl/cells/`; retarget a PDK by reimplementing this dir. PORT IT by
+// swapping the instantiation below; keep the (* keep *)/(* dont_touch *) so the optimiser does not
+// dissolve the ring's combinational loop.
 //
 // Ports:
-//   - a : input
-//   - z : delayed output (z = a after one cell delay)
+//   - a, b : inputs
+//   - y    : output (y = ~(a & b))
 
-module adpll_delay_cell (
+module adpll_cell_nand (
     input  wire a,
-    output wire z
+    input  wire b,
+    output wire y
 );
 
 `ifdef SYNTHESIS
 // --- gf180mcu 3.3 V (replace this instantiation for another PDK) ---
 (* keep *) (* dont_touch = "true" *)
-gf180mcu_as_sc_mcu7t3v3__dlybuff_2 u_buf (
+gf180mcu_as_sc_mcu7t3v3__nand2_2 u_cell (
     .A (a),
-    .Y (z)
+    .B (b),
+    .Y (y)
 );
 `else
-// Simulation: the TDC uses a behavioural $realtime model, so the delay line itself is never
-// exercised in sim -- a transparent buffer is sufficient here.
-assign z = a;
+// Functional model (see adpll_cell_inv on the zero-delay note).
+assign y = ~(a & b);
 `endif
 
 endmodule

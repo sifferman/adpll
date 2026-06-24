@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Unit test for the integrated ADPLL subsystem: s_axi_adpll_csr (AXI4-Lite) drives the assembled
-// FLL chain -- adpll_freq_detector (mul/div) -> adpll_loop_filter_bangbang -> adpll_lock_detect --
+// FLL chain -- adpll_freq_detector (mul/div) -> adpll_loop_filter_bangbang -> adpll_lock_detector --
 // closed on ring_dco_binary (behavioural). Drives the CSR exactly as the on-chip fabric does --
 // writes MUL/DIV then sets CTRL.enable -- and polls the STATUS register until the lock bit reads
 // back, mirroring how a host would over Ethernet. Runs under Icarus (SYNTHESIS undefined,
@@ -62,7 +62,7 @@ module tb_adpll_csr;
       .tune_o(tune), .lock_sample_o(lock_sample)
   );
 
-  adpll_lock_detect #(.SampleWidth(NUM_TUNE), .MinSamplesForLock(8), .BandRadius(1)) u_ld (
+  adpll_lock_detector #(.SampleWidth(NUM_TUNE), .MinSamplesForLock(8), .BandRadius(1)) u_ld (
       .clk_i(clk), .rst_ni(rst_n), .enable_i(enable),
       .sample_valid_i(valid), .tuning_sample_i(lock_sample), .lock_o(lock)
   );

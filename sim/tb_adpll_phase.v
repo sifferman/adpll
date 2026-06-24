@@ -2,7 +2,7 @@
 //
 // Testbench for the phase-domain ADPLL, assembled here (no "controller" wrapper) from:
 //   ring DCO -> adpll_tdc (sub-cycle phase) -> adpll_phase_detector (phase error)
-//            -> adpll_loop_filter_pi (PI) -> adpll_lock_detect.
+//            -> adpll_loop_filter_pi (PI) -> adpll_lock_detector.
 // Runs under Icarus (SYNTHESIS undefined) so the DCO and TDC compile their behavioural models.
 // Unlike the frequency-locked tb_adpll, this loop nulls PHASE: the detector advances a reference
 // phase by fcw_i each reference cycle and the variable phase by the DCO edge count plus the TDC
@@ -75,7 +75,7 @@ module tb_adpll_phase;
       .lock_sample_o(lock_sample)
   );
 
-  adpll_lock_detect #(.SampleWidth(NUM_TUNE), .MinSamplesForLock(8), .BandRadius(2)) u_ld (
+  adpll_lock_detector #(.SampleWidth(NUM_TUNE), .MinSamplesForLock(8), .BandRadius(2)) u_ld (
       .clk_i          (clk),
       .rst_ni         (rst_n),
       .enable_i       (enable),

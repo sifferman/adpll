@@ -32,7 +32,7 @@
 // thermometer FINE bank whose unit delay is a single inverter pair. The coarse unit delay is
 // therefore exactly 2^NumFineBits fine units, so the two banks splice into one monotonic curve
 // (a wide range from a few coarse units, fine resolution from the fine units -- the resolution/
-// range trade a single bank can't make). SYNTHESIS = structural gf180 cells; else behavioural.
+// range trade a single bank can't make). SYNTHESIS = structural adpll_cell_* (rtl/cells/); else behavioural.
 //
 // Parameters:
 //   - NumTuneBits : total tune-code width
@@ -67,11 +67,10 @@ wire [NumFineBits-1:0]   fine_code   = tune_i[NumFineBits-1:0];
 wire feedback;
 wire [NumCoarseUnits:0] coarse_node;
 
-(* keep *) (* dont_touch = "true" *)
-gf180mcu_as_sc_mcu7t3v3__nand2_2 u_gate (
-    .A (enable_i),
-    .B (feedback),
-    .Y (coarse_node[0])
+adpll_cell_nand u_gate (
+    .a (enable_i),
+    .b (feedback),
+    .y (coarse_node[0])
 );
 
 // Coarse bank: unit k inserts CoarsePairs inverter-pairs of delay when k < coarse_code.
@@ -79,23 +78,20 @@ for (genvar k_GEN = 0; k_GEN < NumCoarseUnits; k_GEN++) begin : coarse_unit
     wire [2*CoarsePairs:0] d;
     assign d[0] = coarse_node[k_GEN];
     for (genvar j_GEN = 0; j_GEN < CoarsePairs; j_GEN++) begin : inverter_pair
-        (* keep *) (* dont_touch = "true" *)
-        gf180mcu_as_sc_mcu7t3v3__inv_2 u_inv_a (
-            .A (d[2*j_GEN]),
-            .Y (d[2*j_GEN + 1])
+        adpll_cell_inv u_inv_a (
+            .a (d[2*j_GEN]),
+            .z (d[2*j_GEN + 1])
         );
-        (* keep *) (* dont_touch = "true" *)
-        gf180mcu_as_sc_mcu7t3v3__inv_2 u_inv_b (
-            .A (d[2*j_GEN + 1]),
-            .Y (d[2*j_GEN + 2])
+        adpll_cell_inv u_inv_b (
+            .a (d[2*j_GEN + 1]),
+            .z (d[2*j_GEN + 2])
         );
     end
-    (* keep *) (* dont_touch = "true" *)
-    gf180mcu_as_sc_mcu7t3v3__mux2_2 u_sel (
-        .A (coarse_node[k_GEN]),
-        .B (d[2*CoarsePairs]),
-        .S (k_GEN < coarse_code),
-        .Y (coarse_node[k_GEN + 1])
+    adpll_cell_mux u_sel (
+        .a (coarse_node[k_GEN]),
+        .b (d[2*CoarsePairs]),
+        .s (k_GEN < coarse_code),
+        .y (coarse_node[k_GEN + 1])
     );
 end
 
@@ -104,22 +100,19 @@ wire [NumFineUnits:0] fine_node;
 assign fine_node[0] = coarse_node[NumCoarseUnits];
 for (genvar k_GEN = 0; k_GEN < NumFineUnits; k_GEN++) begin : fine_unit
     wire mid, delayed;
-    (* keep *) (* dont_touch = "true" *)
-    gf180mcu_as_sc_mcu7t3v3__inv_2 u_inv_a (
-        .A (fine_node[k_GEN]),
-        .Y (mid)
+    adpll_cell_inv u_inv_a (
+        .a (fine_node[k_GEN]),
+        .z (mid)
     );
-    (* keep *) (* dont_touch = "true" *)
-    gf180mcu_as_sc_mcu7t3v3__inv_2 u_inv_b (
-        .A (mid),
-        .Y (delayed)
+    adpll_cell_inv u_inv_b (
+        .a (mid),
+        .z (delayed)
     );
-    (* keep *) (* dont_touch = "true" *)
-    gf180mcu_as_sc_mcu7t3v3__mux2_2 u_sel (
-        .A (fine_node[k_GEN]),
-        .B (delayed),
-        .S (k_GEN < fine_code),
-        .Y (fine_node[k_GEN + 1])
+    adpll_cell_mux u_sel (
+        .a (fine_node[k_GEN]),
+        .b (delayed),
+        .s (k_GEN < fine_code),
+        .y (fine_node[k_GEN + 1])
     );
 end
 

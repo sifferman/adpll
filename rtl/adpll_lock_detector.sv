@@ -24,7 +24,7 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-// adpll_lock_detect
+// adpll_lock_detector
 //
 // Ref: Lee, Kundert & Razavi, IEEE JSSC 39(9), 2004 (bang-bang limit-cycle lock).
 // Asserts lock_o once the sampled value stays within +/-BandRadius of the band_center (its
@@ -40,7 +40,7 @@
 //   - tuning_sample_i : value sampled each window (its stability is what is detected)
 //   - lock_o          : lock asserted
 
-module adpll_lock_detect #(
+module adpll_lock_detector #(
     parameter int unsigned SampleWidth = 7,
     parameter int unsigned MinSamplesForLock = 8,
     parameter int unsigned BandRadius  = 1
@@ -51,6 +51,7 @@ module adpll_lock_detect #(
     input  wire                   enable_i,
     input  wire                   sample_valid_i,
     input  wire [SampleWidth-1:0] tuning_sample_i,
+
     output wire                   lock_o
 );
 

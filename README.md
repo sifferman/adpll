@@ -34,12 +34,15 @@ wants directly (see `sim/tb_adpll.v`).
 - **Detectors** — `adpll_freq_detector` (frequency error: DCO-edge count over a runtime window vs a
   target) and `adpll_phase_detector` (phase error: reference/variable phase accumulators + the
   `adpll_tdc` sub-cycle fraction). Both build on the shared `adpll_freq_counter` (Gray-CDC edge
-  counter); `adpll_lock_detect` watches the settled tune code.
+  counter); `adpll_lock_detector` watches the settled tune code.
 - **Loop filters** (`rtl/loop_filter/`) — `bangbang` (1-bit sign), `pi` (multi-bit linear PI,
   power-of-two α/β, anti-windup), `gearshift` (adaptive-step binary search). The error source is
   external, so the *same* `pi` filter closes both the linear FLL (behind `adpll_freq_detector`)
   and the type-II phase loop (behind `adpll_phase_detector`) — only the widths/gains differ.
 - **DCOs** (`rtl/dco/`) — `binary`, `thermometer`, `muxtap`, `coarsefine` ring oscillators.
+- **Cells** (`rtl/cells/`) — `adpll_cell_delay`/`_inv`/`_nand`/`_mux`, the only PDK-specific
+  primitives. The rings and TDC instantiate these wrappers, not PDK cells, so retargeting a PDK
+  means reimplementing just this dir (see *Portability*).
 - **CSR** (`rtl/axi/`) — `s_axi_adpll_csr`, a single-PLL AXI4-Lite control/status block (enable/mul/div
   + lock/tune) showing how to drive one PLL over a bus.
 
@@ -51,7 +54,8 @@ array from these blocks) — this repo ships the reusable parameterizable parts.
 
 ```
 rtl/             adpll_freq_counter, adpll_freq_detector, adpll_phase_detector,
-                 adpll_lock_detect, adpll_tdc, adpll_delay_cell
+                 adpll_lock_detector, adpll_tdc
+rtl/cells        adpll_cell_delay / inv / nand / mux -- the PDK-specific primitives (THE retarget seam)
 rtl/loop_filter  bangbang / pi / gearshift loop filters
 rtl/dco          binary / thermometer / muxtap / coarsefine ring DCOs
 rtl/axi          s_axi_adpll_csr (AXI4-Lite control/status)
@@ -78,12 +82,15 @@ make dco-spice PDK_ROOT=/path/to/pdks PDK=gf180mcuD NGSPICE=/path/to/ngspice TOP
 
 ## Portability
 
-Everything except the DCO rings and the TDC delay line is PDK-agnostic. Those instantiate gf180
-primitives (`inv`/`nand2`/`mux2` in the rings; `adpll_delay_cell`, a `dlybuff` wrapper, in the
-TDC). To retarget, re-implement those cells for your PDK and keep the ring's combinational loop out of optimization
-(`keep`/`dont_touch`) and out of the clock-tree/STA (leave the DCO clock undefined in SDC). The
-absolute frequency is set by the silicon, not RTL — the closed loop tunes to whatever ratio is
-reachable, so there is no "delay" parameter to set.
+Every PDK-specific primitive is isolated in **`rtl/cells/`** — the single retarget seam. The ring
+DCOs and the TDC delay line instantiate only these wrappers (`adpll_cell_inv`/`_nand`/`_mux` in the
+rings; `adpll_cell_delay` in the TDC), never a PDK cell directly. Each wrapper is `` `ifdef SYNTHESIS ``
+→ the gf180 3.3 V cell (`inv_2`/`nand2_2`/`mux2_2`/`dlybuff_2`, with `keep`/`dont_touch`), `` `else ``
+→ a behavioural model. **To retarget a PDK (sky130, ASAP7, …), reimplement just `rtl/cells/`** — the
+rings, TDC, detectors, and loop filters are untouched. Keep the ring's combinational loop out of
+optimization (`keep`/`dont_touch`) and out of the clock-tree/STA (leave the DCO clock undefined in
+SDC). The absolute frequency is set by the silicon, not RTL — the closed loop tunes to whatever ratio
+is reachable, so there is no "delay" parameter to set.
 
 ## License
 

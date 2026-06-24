@@ -29,7 +29,7 @@
 // Ref: Staszewski & Balsara (Wiley, 2006), Ch. 2-3 (ring DCO, delay tuning).
 // All-standard-cell ring oscillator: a NAND gate gates/sustains oscillation and
 // binary-weighted inverter-pair segments (one mux each) insert delay by the binary value of
-// tune_i. SYNTHESIS = structural gf180 cells (keep/dont_touch); else a behavioural model.
+// tune_i. SYNTHESIS = structural adpll_cell_* primitives (rtl/cells/); else a behavioural model.
 //
 // Parameters:
 //   - NumTuneBits : tune-code width (number of delay elements)
@@ -55,11 +55,10 @@ module ring_dco_binary #(
 wire feedback;
 wire [NumTuneBits:0] node;
 
-(* keep *) (* dont_touch = "true" *)
-gf180mcu_as_sc_mcu7t3v3__nand2_2 u_gate (
-    .A (enable_i),
-    .B (feedback),
-    .Y (node[0])
+adpll_cell_nand u_gate (
+    .a (enable_i),
+    .b (feedback),
+    .y (node[0])
 );
 
 for (genvar i_GEN = 0; i_GEN < NumTuneBits; i_GEN++) begin : delay_segment
@@ -67,23 +66,20 @@ for (genvar i_GEN = 0; i_GEN < NumTuneBits; i_GEN++) begin : delay_segment
     wire [2*NumStages:0] d;
     assign d[0] = node[i_GEN];
     for (genvar j_GEN = 0; j_GEN < NumStages; j_GEN++) begin : inverter_pair
-        (* keep *) (* dont_touch = "true" *)
-        gf180mcu_as_sc_mcu7t3v3__inv_2 u_inv_a (
-            .A (d[2*j_GEN]),
-            .Y (d[2*j_GEN + 1])
+        adpll_cell_inv u_inv_a (
+            .a (d[2*j_GEN]),
+            .z (d[2*j_GEN + 1])
         );
-        (* keep *) (* dont_touch = "true" *)
-        gf180mcu_as_sc_mcu7t3v3__inv_2 u_inv_b (
-            .A (d[2*j_GEN + 1]),
-            .Y (d[2*j_GEN + 2])
+        adpll_cell_inv u_inv_b (
+            .a (d[2*j_GEN + 1]),
+            .z (d[2*j_GEN + 2])
         );
     end
-    (* keep *) (* dont_touch = "true" *)
-    gf180mcu_as_sc_mcu7t3v3__mux2_2 u_sel (
-        .A (node[i_GEN]),
-        .B (d[2*NumStages]),
-        .S (tune_i[i_GEN]),
-        .Y (node[i_GEN + 1])
+    adpll_cell_mux u_sel (
+        .a (node[i_GEN]),
+        .b (d[2*NumStages]),
+        .s (tune_i[i_GEN]),
+        .y (node[i_GEN + 1])
     );
 end
 

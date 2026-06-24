@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Survey testbench for the digital ADPLL: ring DCO + a frequency detector (adpll_freq_detector)
-// + a loop filter + adpll_lock_detect, assembled here (there is no "controller" wrapper). Runs
+// + a loop filter + adpll_lock_detector, assembled here (there is no "controller" wrapper). Runs
 // under Icarus (SYNTHESIS undefined) so the DCO compiles its behavioural clock model. Selects the
 // filter and DCO variant with plusdefines (testbench-only, not RTL):
 //   default              : adpll_loop_filter_bangbang (bang-bang) + ring_dco_binary (binary)
@@ -82,7 +82,7 @@ module tb_adpll;
       .lock_sample_o(lock_sample)
   );
 
-  adpll_lock_detect #(.SampleWidth(NUM_TUNE), .MinSamplesForLock(8), .BandRadius(LOCK_BAND)) u_ld (
+  adpll_lock_detector #(.SampleWidth(NUM_TUNE), .MinSamplesForLock(8), .BandRadius(LOCK_BAND)) u_ld (
       .clk_i          (clk),
       .rst_ni         (rst_n),
       .enable_i       (enable),

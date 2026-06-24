@@ -6,7 +6,7 @@ SHELL := /bin/bash
 # 1ns/1ps default timescale via an iverilog command file (process substitution -- no source stub).
 TS    = -c <(printf '+timescale+1ns/1ps\n')
 # Shared core + all loop filters + all DCOs (single-PLL testbench picks one of each via plusdefines)
-CORE  = $(wildcard rtl/*.sv rtl/loop_filter/*.sv rtl/dco/*.sv)
+CORE  = $(wildcard rtl/*.sv rtl/cells/*.sv rtl/loop_filter/*.sv rtl/dco/*.sv)
 NGSPICE ?= ngspice
 
 .PHONY: help sim-adpll sim-adpll-survey sim-adpll-matrix sim-adpll-phase sim-adpll-csr dco-spice clean
@@ -44,14 +44,14 @@ sim-adpll-matrix: ## All 12 FLL variants (3 loop filters x 4 DCOs): lock time + 
 sim-adpll-phase: ## Phase-domain ADPLL (TDC + reference/variable phase accumulators): true phase lock
 	@mkdir -p sim_build
 	iverilog -g2012 -o sim_build/tb_adpll_phase $(TS) \
-		rtl/adpll_freq_counter.sv rtl/adpll_lock_detect.sv rtl/adpll_tdc.sv rtl/adpll_phase_detector.sv \
+		rtl/adpll_freq_counter.sv rtl/adpll_lock_detector.sv rtl/adpll_tdc.sv rtl/adpll_phase_detector.sv \
 		rtl/loop_filter/adpll_loop_filter_pi.sv rtl/dco/ring_dco_binary.sv sim/tb_adpll_phase.v
 	vvp sim_build/tb_adpll_phase | grep -E "LOCKED|PASS|FAIL"
 
 sim-adpll-csr: ## Single-PLL CSR: program mul/div/enable over AXI4-Lite, poll STATUS for lock
 	@mkdir -p sim_build
 	iverilog -g2012 -o sim_build/tb_adpll_csr $(TS) \
-		rtl/axi/s_axi_adpll_csr.sv rtl/adpll_freq_detector.sv rtl/adpll_freq_counter.sv rtl/adpll_lock_detect.sv \
+		rtl/axi/s_axi_adpll_csr.sv rtl/adpll_freq_detector.sv rtl/adpll_freq_counter.sv rtl/adpll_lock_detector.sv \
 		rtl/loop_filter/adpll_loop_filter_bangbang.sv rtl/dco/ring_dco_binary.sv sim/tb_adpll_csr.v
 	vvp sim_build/tb_adpll_csr | grep -E "CSR programmed|LOCKED|PASS|FAIL"
 

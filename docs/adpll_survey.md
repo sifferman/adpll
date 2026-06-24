@@ -38,7 +38,7 @@ A programmable-ratio frequency synthesizer, the canonical ADPLL pipeline
 ```
 
 There is no monolithic "controller": a PLL is three swappable stages wired directly —
-**detector** (what error) → **loop filter** (how to correct) → **DCO** — plus `adpll_lock_detect`.
+**detector** (what error) → **loop filter** (how to correct) → **DCO** — plus `adpll_lock_detector`.
 
 At lock `measured == mul`, so **F_DCO = (mul / div) · F_clk_i**: `mul` is the
 feedback-multiply ratio N and `div` is the reference divider M. Both are **runtime inputs**
@@ -53,13 +53,14 @@ temperature (PVT) variations."* A second-order (type-II) loop suffices: [Kratyuk
 | module | role |
 |---|---|
 | `adpll_freq_counter` | Gray-coded DCO-edge counter over a runtime-length measurement window; frequency-to-digital primitive. Shared by both detectors. |
-| `adpll_lock_detect` | declares lock when the watched control code holds within ±`BandRadius` for `MinSamplesForLock` consecutive samples. Shared. |
-| `adpll_tdc` | time-to-digital converter: sub-cycle DCO phase at the reference edge (flash delay line of `adpll_delay_cell`s in synthesis / behavioural `$realtime` model in sim). Used only by `adpll_phase_detector`. |
+| `adpll_lock_detector` | declares lock when the watched control code holds within ±`BandRadius` for `MinSamplesForLock` consecutive samples. Shared. |
+| `adpll_tdc` | time-to-digital converter: sub-cycle DCO phase at the reference edge (flash delay line of `adpll_cell_delay`s in synthesis / behavioural `$realtime` model in sim). Used only by `adpll_phase_detector`. |
 
 ## DCO variants (interface `enable_i`, `tune_i[NumTuneBits-1:0]`, `clk_o`)
 
 All four are ring oscillators (one NAND gate gives the single inversion; `enable_i` gates
-it), built from `nand2`/`inv`/`mux2` cells with `keep`/`dont_touch`. A ring is used over an
+it), built from the `rtl/cells/` primitives (`adpll_cell_nand`/`_inv`/`_mux`, gf180 cells with
+`keep`/`dont_touch` under that PDK seam). A ring is used over an
 LC DCO because LC needs an inductor + MOS varactors ([Staszewski2006] §2.1–2.3) — not
 standard cells; the accepted cost is phase noise: ring synthesizers *"are all based on a ring
 oscillator structure which inherently features relatively poor phase-noise characteristics"*

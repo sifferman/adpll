@@ -30,7 +30,7 @@
 // matching).
 // Ring oscillator tuned by a UNIT-weighted (thermometer) delay line: code k inserts k
 // identical unit-pair delays, so the curve is monotonic by construction (2^N-1 units).
-// SYNTHESIS = structural gf180 cells; else a behavioural model.
+// SYNTHESIS = structural adpll_cell_* primitives (rtl/cells/); else a behavioural model.
 //
 // Parameters:
 //   - NumTuneBits : tune-code width (number of delay elements)
@@ -60,32 +60,28 @@ end
 wire feedback;
 wire [NumUnits:0] node;
 
-(* keep *) (* dont_touch = "true" *)
-gf180mcu_as_sc_mcu7t3v3__nand2_2 u_gate (
-    .A (enable_i),
-    .B (feedback),
-    .Y (node[0])
+adpll_cell_nand u_gate (
+    .a (enable_i),
+    .b (feedback),
+    .y (node[0])
 );
 
 for (genvar k_GEN = 0; k_GEN < NumUnits; k_GEN++) begin : delay_unit
     wire mid, delayed;
-    (* keep *) (* dont_touch = "true" *)
-    gf180mcu_as_sc_mcu7t3v3__inv_2 u_inv_a (
-        .A (node[k_GEN]),
-        .Y (mid)
+    adpll_cell_inv u_inv_a (
+        .a (node[k_GEN]),
+        .z (mid)
     );
-    (* keep *) (* dont_touch = "true" *)
-    gf180mcu_as_sc_mcu7t3v3__inv_2 u_inv_b (
-        .A (mid),
-        .Y (delayed)
+    adpll_cell_inv u_inv_b (
+        .a (mid),
+        .z (delayed)
     );
     // Insert this unit's delay when its thermometer bit is set, else bypass.
-    (* keep *) (* dont_touch = "true" *)
-    gf180mcu_as_sc_mcu7t3v3__mux2_2 u_sel (
-        .A (node[k_GEN]),
-        .B (delayed),
-        .S (unit_enable[k_GEN]),
-        .Y (node[k_GEN + 1])
+    adpll_cell_mux u_sel (
+        .a (node[k_GEN]),
+        .b (delayed),
+        .s (unit_enable[k_GEN]),
+        .y (node[k_GEN + 1])
     );
 end
 
