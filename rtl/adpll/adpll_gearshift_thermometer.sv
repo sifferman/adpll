@@ -27,11 +27,12 @@
 // adpll_gearshift_thermometer
 //
 // Ref: Da Dalt TCAS-I 2005 (adaptive-step gear-shifting); Staszewski Wiley 2006 Ch.3,5 (thermometer / unit-weighted). See the loop-filter / DCO source files for detail.
-// One fixed ADPLL configuration = gearshift loop filter + thermometer DCO, assembled
+// One ADPLL configuration = gearshift loop filter + thermometer DCO, assembled
 // from the generic adpll blocks (detector -> loop filter -> DCO, plus lock detect; no "controller"
-// wrapper). Param-free -- the configuration (7-bit tune
-// code, 24-bit edge count, 16-bit window) is fixed here. Each loop-filter x DCO combination is its
-// own module name (an RTL config synthesised inline, not a hardened macro).
+// wrapper). Parameterizable -- NumTuneBits / MaxEdgesPerWindow / MaxWindowSize / the lock criterion size the
+// tune code, edge counter, window and lock band (defaults are the full-rate 7/24/16 config; shrink
+// them for a fast closed-loop SPICE run). Each loop-filter x DCO combination is its own module name
+// (an RTL config elaborated inline, not a hardened macro).
 //
 // Ports:
 //   - clk_i, rst_ni, enable_i : run + program
@@ -39,22 +40,27 @@
 //   - lock_o, tune_o : status
 //   - dco_clk_o      : raw DCO clock, brought out for observation
 
-module adpll_gearshift_thermometer (
-    input  wire        clk_i,
-    input  wire        rst_ni,
-    input  wire        enable_i,
-    input  wire [23:0] mul_i,       // EdgeCountWidth  = 24 = $clog2(MaxEdgesPerWindow+1)
-    input  wire [15:0] div_i,       // WindowSizeWidth = 16 = $clog2(MaxWindowSize+1)
+module adpll_gearshift_thermometer #(
+    parameter  int unsigned NumTuneBits       = 7,
+    parameter  int unsigned MaxEdgesPerWindow = (1 << 24) - 1,  // sets mul_i width (EdgeCountWidth)
+    parameter  int unsigned MaxWindowSize     = (1 << 16) - 1,  // sets div_i width (WindowSizeWidth)
+    parameter  int unsigned MinSamplesForLock = 8,
+    parameter  int unsigned BandRadius        = 1,
+    localparam int unsigned EdgeCountWidth    = $clog2(MaxEdgesPerWindow + 1),
+    localparam int unsigned WindowSizeWidth   = $clog2(MaxWindowSize + 1),
+    localparam int unsigned ErrorWidth        = EdgeCountWidth + 2   // = adpll_freq_detector.ErrorWidth
+) (
+    input  wire                        clk_i,
+    input  wire                        rst_ni,
+    input  wire                        enable_i,
+    input  wire [EdgeCountWidth-1:0]   mul_i,   // multiply ratio N (target edge count, set over CSR)
+    input  wire [WindowSizeWidth-1:0]  div_i,   // window length M (reference cycles, set over CSR)
 
-    output wire        lock_o,
-    output wire [6:0]  tune_o,      // NumTuneBits = 7
-    output wire        dco_clk_o    // raw DCO oscillation, for observation
+    output wire                        lock_o,
+    output wire [NumTuneBits-1:0]      tune_o,
+    output wire                        dco_clk_o    // raw DCO oscillation, for observation
 );
 
-localparam int unsigned NumTuneBits       = 7;
-localparam int unsigned MaxEdgesPerWindow = (1 << 24) - 1;
-localparam int unsigned MaxWindowSize     = (1 << 16) - 1;
-localparam int unsigned ErrorWidth        = $clog2(MaxEdgesPerWindow + 1) + 2;  // = adpll_freq_detector.ErrorWidth
 
 wire signed [ErrorWidth-1:0] error;
 wire                         valid;
@@ -94,8 +100,8 @@ adpll_loop_filter_gearshift #(
 // lock detect: watches the settled tune sample
 adpll_lock_detector #(
     .SampleWidth      (NumTuneBits),
-    .MinSamplesForLock(8),
-    .BandRadius       (1)
+    .MinSamplesForLock(MinSamplesForLock),
+    .BandRadius       (BandRadius)
 ) adpll_lock_detector (
     .clk_i          (clk_i),
     .rst_ni         (rst_ni),
