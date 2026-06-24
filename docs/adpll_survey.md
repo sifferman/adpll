@@ -181,7 +181,7 @@ The extraction is slower per code than the single-bank rings (the coarse bank in
 
 ## On-chip: the 12-PLL array
 
-All 12 FLL macros (3 loop filters × 4 DCOs) ship in `chip_core` as `adpll_array`, each wired to
+All 12 FLL configs (3 loop filters × 4 DCOs) ship in `chip_core` as `adpll_array`, each wired to
 `adpll_array_csr` (AXI4-Lite at `0x2000_0000`): a host programs every PLL independently over
 Ethernet (PLL `i` = four words at byte offset `i*0x10`: `CTRL`/`MUL`/`DIV`/`STATUS`) and a global
 `OBS_SEL` (`0xC0`) picks which PLL's clock+lock drive the observation mux. The 12 PLLs add **zero

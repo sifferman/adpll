@@ -46,7 +46,7 @@ wants directly (see `sim/tb_adpll.v`).
 - **CSR** (`rtl/axi/`) — `s_axi_adpll_csr`, a single-PLL AXI4-Lite control/status block (enable/mul/div
   + lock/tune) showing how to drive one PLL over a bus.
 
-Picking specific frozen detector×filter×DCO configurations ("macros") and arraying many PLLs behind
+Picking specific frozen detector×filter×DCO configurations and arraying many PLLs behind
 one bus is integration left to the instantiating project (e.g. gf180mcu-peripherals builds a 12-PLL
 array from these blocks) — this repo ships the reusable parameterizable parts.
 
