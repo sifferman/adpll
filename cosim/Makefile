@@ -91,7 +91,16 @@ build/ring.spice: ../librelane/ring_dco.yaml
 # in tens of windows within a tractable transient.
 build/synth.v: $(LOOP_RTL) build/ring_bb.v
 	mkdir -p $(dir $@)
-	yosys -m slang -p "read_slang --ignore-unknown-modules -G FreqDetectorMaxEdgesPerWindow=255 -G FreqDetectorMaxWindowSize=15 build/ring_bb.v $(LOOP_RTL); hierarchy -top $(ADPLL); delete t:$(RINGDCO); expose -input w:dco_clk; synth -top $(ADPLL) -flatten; dfflibmap -liberty $(LIB); abc -liberty $(LIB); opt_clean -purge; write_verilog -noattr $@"
+	yosys -m slang \
+	 -p "read_slang --ignore-unknown-modules -G FreqDetectorMaxEdgesPerWindow=255 -G FreqDetectorMaxWindowSize=15 build/ring_bb.v $(LOOP_RTL)" \
+	 -p "hierarchy -top $(ADPLL)" \
+	 -p "delete t:$(RINGDCO)" \
+	 -p "expose -input w:dco_clk" \
+	 -p "synth -top $(ADPLL) -flatten" \
+	 -p "dfflibmap -liberty $(LIB)" \
+	 -p "abc -liberty $(LIB)" \
+	 -p "opt_clean -purge" \
+	 -p "write_verilog -noattr $@"
 
 # Compile the gate loop + gf180 behavioural cell models into a vvp (timescale stub so vvp time != 1 s).
 build/synth.vvp: build/synth.v $(CELLV)
