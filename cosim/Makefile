@@ -27,8 +27,12 @@ PDK_ROOT ?= $(HOME)/.ciel
 LIB           := $(PDK_ROOT)/$(PDK)/libs.ref/$(SCL)/lib/$(SCL)__tt_025C_3v30.lib
 PDK_SIM_CELLS := $(PDK_ROOT)/$(PDK)/libs.ref/$(SCL)/verilog/$(SCL).v
 
-IVL_PREFIX ?= /tmp/iverilog-libvvp
+# iverilog/vvp must be built --enable-libvvp (ivlng dlopens libvvp + runs vvp). Default to the install
+# prefix of whatever `iverilog` is on PATH (the dir above its bin/). Override IVL_PREFIX if that build
+# wasn't --enable-libvvp -- the cosim recipe checks lib/libvvp.so is actually there before running.
+IVL_PREFIX ?= $(abspath $(dir $(shell command -v iverilog))/..)
 IVERILOG   := $(IVL_PREFIX)/bin/iverilog
+LIBVVP     := $(IVL_PREFIX)/lib/libvvp.so
 
 # adpll_<filter>_<dco>: split on '_'. The filter token is exactly the loop-filter file suffix.
 FILTER  := $(word 2,$(subst _, ,$(ADPLL)))
@@ -60,6 +64,7 @@ LOG       := $(B)/cosim.log
 .DELETE_ON_ERROR:
 
 cosim: $(SYNTH_VVP) $(RING)
+	@test -e "$(LIBVVP)" || { echo "ERROR: $(LIBVVP) not found -- ivlng needs iverilog built --enable-libvvp. Set IVL_PREFIX=<that install>, or put a libvvp iverilog first on PATH."; exit 1; }
 	./generate_cosim_tb.py \
 	 --vvp synth.vvp \
 	 --ring-subckt $(RINGDCO) \
