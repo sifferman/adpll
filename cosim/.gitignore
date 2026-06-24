@@ -1,0 +1,4 @@
+*.so
+*_obj_dir/
+ring_dco_binary.spice
+*.txt
