@@ -5,7 +5,8 @@
 # The loop netlist is DERIVED from the adpll wrapper by yosys -- there is NO hand-written loop top:
 # the ring DCO is black-boxed, its clk_o is promoted to a top input (`dco_clk`), tune stays as
 # `debug_dco_tune_o`, and the loop (detector/filter/lock/post-divider) is mapped to gf180 cells.
-# Each artifact below is a file target so `make` rebuilds only what changed; everything lands in build/.
+# Each artifact below is a file target so `make` rebuilds only what changed. Artifacts go in a
+# per-(config, corner) dir, build/<cfg>/<corner>/, so independent sims can run in parallel.
 #
 # Run inside the nix devshell with an enabled gf180 PDK at $PDK_ROOT, e.g.:
 #   nix develop ../.. -c make -C cosim cosim ADPLL=adpll_bangbang_binary CORNER=typical
@@ -46,13 +47,19 @@ LOOP_RTL := $(RTL_DIR)/adpll/$(ADPLL).sv \
 NIXLIB = $(shell ls -d /nix/store/*$(1)*/lib 2>/dev/null | grep -v -- -dev | head -1)
 IVLNG_LIBS := $(IVL_PREFIX)/lib:$(call NIXLIB,bzip2-1.0.8):$(call NIXLIB,zlib-1.3):$(call NIXLIB,readline-8.3):$(call NIXLIB,gcc-14)
 
-TB  := build/$(ADPLL)_$(CORNER)_cosim_tb.spice
-LOG := build/$(ADPLL)_$(CORNER).log
+# Per-(config, corner) build dir so independent sims run in parallel without clobbering each other.
+B         := build/$(ADPLL)/$(CORNER)
+RING      := $(B)/ring.spice
+RING_BB   := $(B)/ring_bb.v
+SYNTH_V   := $(B)/synth.v
+SYNTH_VVP := $(B)/synth.vvp
+TB        := $(B)/cosim_tb.spice
+LOG       := $(B)/cosim.log
 
 .PHONY: cosim clean
 .DELETE_ON_ERROR:
 
-cosim: build/synth.vvp build/ring.spice
+cosim: $(SYNTH_VVP) $(RING)
 	./generate_cosim_tb.py \
 	 --vvp synth.vvp \
 	 --ring-subckt $(RINGDCO) \
@@ -62,7 +69,7 @@ cosim: build/synth.vvp build/ring.spice
 	 --div $(DIV) \
 	 --post-div $(POST_DIV) > $(TB)
 	@echo "== ngspice gate-level cosim ($(ADPLL) @ $(CORNER)) =="
-	cd build && \
+	cd $(B) && \
 	 env -u DISPLAY \
 	  PDK_ROOT=$(PDK_ROOT) \
 	  LD_LIBRARY_PATH="$$LD_LIBRARY_PATH:$(IVLNG_LIBS)" \
@@ -79,23 +86,23 @@ cosim: build/synth.vvp build/ring.spice
 	 fi
 
 # Blackbox stub for the ring so read_slang accepts the wrapper's parameterized ring instantiation
-build/ring_bb.v: $(RTL_DIR)/dco/$(RINGDCO).sv
+$(RING_BB): $(RTL_DIR)/dco/$(RINGDCO).sv
 	mkdir -p $(dir $@)
 	{ echo '(* blackbox *)'; sed -n '/^module/,/);/p' $<; echo endmodule; } > $@
 
-build/ring.spice: ../librelane/ring_dco.yaml
+$(RING): ../librelane/ring_dco.yaml
 	mkdir -p $(dir $@)
 	librelane ../librelane/ring_dco.yaml --pdk $(PDK) --pdk-root $(PDK_ROOT) --scl $(SCL) -c DESIGN_NAME=$(RINGDCO)
 	cp $$(ls -td ../librelane/runs/*/final/spice/$(RINGDCO).spice | head -1) $@
 
-build/synth.v: $(LOOP_RTL) build/ring_bb.v
+$(SYNTH_V): $(LOOP_RTL) $(RING_BB)
 	mkdir -p $(dir $@)
 	yosys -m slang \
 	 -p "read_slang \
 	      --ignore-unknown-modules \
 	      -G FreqDetectorMaxEdgesPerWindow=255 \
 	      -G FreqDetectorMaxWindowSize=15 \
-	      build/ring_bb.v \
+	      $(RING_BB) \
 	      $(LOOP_RTL)" \
 	 -p "hierarchy -top $(ADPLL)" \
 	 -p "delete t:$(RINGDCO)" \
@@ -106,10 +113,10 @@ build/synth.v: $(LOOP_RTL) build/ring_bb.v
 	 -p "opt_clean -purge" \
 	 -p "write_verilog -noattr $@"
 
-build/synth.vvp: build/synth.v $(PDK_SIM_CELLS)
+$(SYNTH_VVP): $(SYNTH_V) $(PDK_SIM_CELLS)
 	mkdir -p $(dir $@)
-	printf '`timescale 1ns/1ps\n' > build/timescale.v
-	$(IVERILOG) -g2012 -o $@ build/timescale.v build/synth.v $(PDK_SIM_CELLS)
+	printf '`timescale 1ns/1ps\n' > $(B)/timescale.v
+	$(IVERILOG) -g2012 -o $@ $(B)/timescale.v $(SYNTH_V) $(PDK_SIM_CELLS)
 
 clean:
 	rm -rf build

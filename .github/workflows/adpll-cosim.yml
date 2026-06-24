@@ -82,7 +82,7 @@ jobs:
         if: always()
         run: |
           { echo "### ${{ matrix.adpll }} @ ${{ matrix.corner }}"; echo '```'; \
-            grep -aiE "LOCKED|NO-LOCK|t_lock" cosim/build/${{ matrix.adpll }}_${{ matrix.corner }}.log 2>/dev/null || echo "(no result)"; \
+            grep -aiE "LOCKED|NO-LOCK|t_lock" cosim/build/${{ matrix.adpll }}/${{ matrix.corner }}/cosim.log 2>/dev/null || echo "(no result)"; \
             echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload
@@ -90,5 +90,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cosim-${{ matrix.adpll }}-${{ matrix.corner }}
-          path: cosim/build/${{ matrix.adpll }}_${{ matrix.corner }}.log
+          path: cosim/build/${{ matrix.adpll }}/${{ matrix.corner }}/cosim.log
           if-no-files-found: ignore
