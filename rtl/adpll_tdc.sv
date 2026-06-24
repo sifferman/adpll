@@ -71,8 +71,8 @@ for (genvar i_GEN = 0; i_GEN < NumTaps; i_GEN++) begin : delay_line
     );
 end
 
-// Sample every tap on the reference edge (inferred flops; (* keep *) so they are not merged away).
-(* keep *) logic [NumTaps-1:0] sampled;
+// Sample every tap on the reference edge (the delay cells carry their own keep/dont_touch).
+logic [NumTaps-1:0] sampled;
 always_ff @(posedge clk_i or negedge rst_ni)
     if (!rst_ni) sampled <= '0;
     else         sampled <= tap[NumTaps:1];
