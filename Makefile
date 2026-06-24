@@ -48,7 +48,7 @@ sim-adpll-matrix: ## All 12 FLL variants (3 loop filters x 4 DCOs): lock time + 
 sim-adpll-phase: ## Phase-domain ADPLL (TDC + reference/variable phase accumulators): true phase lock
 	@mkdir -p sim_build
 	iverilog -g2012 -o sim_build/tb_adpll_phase $(TS) \
-		rtl/adpll_freq_counter.sv rtl/adpll_lock_detector.sv rtl/adpll_tdc.sv rtl/adpll_phase_detector.sv \
+		rtl/adpll_freq_counter.sv rtl/adpll_lock_detector.sv sim/adpll_tdc_behavioral.sv rtl/adpll_phase_detector.sv \
 		rtl/loop_filter/adpll_loop_filter_pi.sv sim/ring_dco_behavioral.sv sim/tb_adpll_phase.v
 	vvp sim_build/tb_adpll_phase | grep -E "LOCKED|PASS|FAIL"
 
