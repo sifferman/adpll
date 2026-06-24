@@ -33,16 +33,35 @@
               librelane.overlays.default
             ];
           };
+          # nixpkgs ships iverilog 12.0, which predates libvvp. Build iverilog from git master with
+          # --enable-libvvp so libvvp.so is installed: ngspice's d_cosim "ivlng" Verilog co-sim shim
+          # (the cosim/ gate-level flow) dlopens it at runtime. Pinned to the validated master rev.
+          iverilog-libvvp = pkgs.iverilog.overrideAttrs (old: {
+            version = "14.0-pre-libvvp-78750c5";
+            src = pkgs.fetchFromGitHub {
+              owner = "steveicarus";
+              repo = "iverilog";
+              rev = "78750c51d0065d29cc493669344175f72c5de95f";
+              hash = "sha256-y0/CCq/r3dkMocssSjMYDgT0EpSDQrUzj26r/ex5Pnk=";
+            };
+            patches = [ ];                       # 12.0's format-security patch doesn't apply to master
+            preConfigure = "sh autoconf.sh";     # master ships configure.ac, not a generated configure
+            configureFlags = (old.configureFlags or [ ]) ++ [ "--enable-libvvp" ];
+            doInstallCheck = false;              # 12.0's installCheck runs .github/test.sh, absent in master
+          });
         in
         {
           default = pkgs.librelane-shell.override {
-            extra-packages = with pkgs; [
+            extra-packages = (with pkgs; [
               gnumake          # the dco-spice target
               gnugrep
               gawk
-              iverilog         # the digital sims (matrix / phase / csr)
               verilator
               ngspice          # >=42 for the gf180 BSIM4 models; drives the DCO freq sweep
+            ]) ++ [
+              # hiPrio: win the buildEnv collision against the iverilog librelane-shell bundles, so the
+              # devshell's iverilog/vvp is this libvvp-enabled build. Used by the sims + the cosim's ivlng.
+              (pkgs.lib.hiPrio iverilog-libvvp)
             ];
           };
         }

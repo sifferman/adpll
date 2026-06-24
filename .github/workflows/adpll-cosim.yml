@@ -47,17 +47,6 @@ jobs:
 
       - uses: actions/checkout@v4
 
-      - name: Build iverilog (--enable-libvvp, required by ivlng)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y autoconf gperf flex bison g++ make libbz2-dev zlib1g-dev
-          git clone --depth 1 https://github.com/steveicarus/iverilog.git /tmp/iverilog-src
-          cd /tmp/iverilog-src
-          sh autoconf.sh
-          ./configure --prefix="$HOME/iverilog-libvvp" --enable-libvvp
-          make -j"$(nproc)"
-          make install
-
       - name: Setup Nix
         uses: DeterminateSystems/nix-installer-action@main
         with:
@@ -75,7 +64,7 @@ jobs:
             ciel enable 019cf7a3e0de79bb0e4b6213758882d283c65816 \
               --pdk-root "$PWD/.pdk" --pdk-family gf180mcuD --include-libraries all
             make cosim PDK_ROOT="$PWD/.pdk" PDK=gf180mcuD SCL=gf180mcu_as_sc_mcu7t3v3 \
-              IVL_PREFIX="$HOME/iverilog-libvvp" ADPLL="$ADPLL" CORNER="$CORNER"
+              ADPLL="$ADPLL" CORNER="$CORNER"
           '
 
       - name: Report
