@@ -32,7 +32,7 @@
 // thermometer FINE bank whose unit delay is a single inverter pair. The coarse unit delay is
 // therefore exactly 2^NumFineBits fine units, so the two banks splice into one monotonic curve
 // (a wide range from a few coarse units, fine resolution from the fine units -- the resolution/
-// range trade a single bank can't make). SYNTHESIS = structural adpll_cell_* (rtl/cells/); else behavioural.
+// range trade a single bank can't make). SYNTHESIS = structural adpll_cell_* (rtl/tech_cells/); else behavioural.
 //
 // Parameters:
 //   - NumTuneBits : total tune-code width

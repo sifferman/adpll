@@ -30,7 +30,7 @@
 // matching).
 // Ring oscillator tuned by a UNIT-weighted (thermometer) delay line: code k inserts k
 // identical unit-pair delays, so the curve is monotonic by construction (2^N-1 units).
-// SYNTHESIS = structural adpll_cell_* primitives (rtl/cells/); else a behavioural model.
+// SYNTHESIS = structural adpll_cell_* primitives (rtl/tech_cells/); else a behavioural model.
 //
 // Parameters:
 //   - NumTuneBits : tune-code width (number of delay elements)

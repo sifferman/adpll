@@ -29,7 +29,7 @@
 // Ref: Staszewski & Balsara (Wiley, 2006), Ch. 2-3 (ring DCO, delay tuning).
 // All-standard-cell ring oscillator: a NAND gate gates/sustains oscillation and
 // binary-weighted inverter-pair segments (one mux each) insert delay by the binary value of
-// tune_i. SYNTHESIS = structural adpll_cell_* primitives (rtl/cells/); else a behavioural model.
+// tune_i. SYNTHESIS = structural adpll_cell_* primitives (rtl/tech_cells/); else a behavioural model.
 //
 // Parameters:
 //   - NumTuneBits : tune-code width (number of delay elements)

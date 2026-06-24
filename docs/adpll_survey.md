@@ -59,7 +59,7 @@ temperature (PVT) variations."* A second-order (type-II) loop suffices: [Kratyuk
 ## DCO variants (interface `enable_i`, `tune_i[NumTuneBits-1:0]`, `clk_o`)
 
 All four are ring oscillators (one NAND gate gives the single inversion; `enable_i` gates
-it), built from the `rtl/cells/` primitives (`adpll_cell_nand2`/`_inv`/`_mux2`, gf180 cells with
+it), built from the `rtl/tech_cells/` primitives (`adpll_cell_nand2`/`_inv`/`_mux2`, gf180 cells with
 `keep`/`dont_touch` under that PDK seam). A ring is used over an
 LC DCO because LC needs an inductor + MOS varactors ([Staszewski2006] §2.1–2.3) — not
 standard cells; the accepted cost is phase noise: ring synthesizers *"are all based on a ring

@@ -30,7 +30,7 @@
 // (Wiley, 2006), Ch. 1.
 // Variable-LENGTH ring: a 2^N:1 binary mux tree selects which tap of an inverter-pair chain
 // closes the loop, so tune_i sets the ring length (and thus frequency) directly.
-// SYNTHESIS = structural adpll_cell_* primitives (rtl/cells/); else a behavioural model.
+// SYNTHESIS = structural adpll_cell_* primitives (rtl/tech_cells/); else a behavioural model.
 //
 // Parameters:
 //   - NumTuneBits : tune-code width (number of delay elements)

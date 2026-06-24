@@ -24,29 +24,27 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-// adpll_cell_delay
+// adpll_cell_inv
 //
-// One buffer-delay element: the unit tap of the TDC delay line, where the delay must be a real
-// physical buffer (it cannot be inferred -- a synthesis tool would optimise a plain buffer away,
-// and RTL has no notion of absolute delay). The LSB time is this cell's delay, characterised in
-// SPICE. Ports mirror the gf180 cell (A, Y) so the wrapper is drop-in. The implementation is chosen
-// by the `Target` string parameter, NOT by a `define:
-//   - "gf180mcu_as_sc_mcu7t3v3" : the gf180 3.3 V delay buffer, (* keep *)/(* dont_touch *) so it
-//                                 is preserved.
-//   - "behavioral"              : an RTL model with a unit delay (a real, non-zero tap so a
-//                                 structural delay line is exercisable in sim; the TDC's own sim
-//                                 path uses a $realtime model).
+// Inverter (Y = ~A). One of the PDK-specific primitives the ring DCOs are built from (the
+// delay-segment inverter pairs). Ports mirror the gf180 cell (A, Y) so the wrapper is drop-in.
+// The implementation is chosen by the `Target` string parameter, NOT by a `define -- so a single
+// elaboration can mix targets and a sim needs no special macros:
+//   - "gf180mcu_as_sc_mcu7t3v3" : the gf180 3.3 V standard cell, (* keep *)/(* dont_touch *) so the
+//                                 optimiser does not dissolve the ring's combinational loop.
+//   - "behavioral"              : an RTL model with a unit gate delay (so a structural ring built
+//                                 from these cells actually oscillates in simulation).
 // An unknown Target is a hard error ($fatal). PORT a new PDK by adding a branch here; nothing
-// outside rtl/cells/ changes.
+// outside rtl/tech_cells/ changes.
 //
 // Parameters:
 //   - Target          : target library ("gf180mcu_as_sc_mcu7t3v3" | "behavioral")
-//   - BehavioralDelay : behavioral tap delay (ignored for a real PDK cell, whose delay is the silicon's)
+//   - BehavioralDelay : behavioral gate delay (ignored for a real PDK cell, whose delay is the silicon's)
 // Ports:
 //   - A : input
-//   - Y : delayed output (Y = A after one cell delay)
+//   - Y : inverted output (Y = ~A)
 
-module adpll_cell_delay #(
+module adpll_cell_inv #(
     parameter string   Target          = "behavioral",
     parameter realtime BehavioralDelay = 0.1ns
 ) (
@@ -56,14 +54,14 @@ module adpll_cell_delay #(
 
 if (Target == "gf180mcu_as_sc_mcu7t3v3") begin : g_gf180mcu_as_sc_mcu7t3v3
     (* keep *) (* dont_touch = "true" *)
-    gf180mcu_as_sc_mcu7t3v3__dlybuff_2 u_cell (
+    gf180mcu_as_sc_mcu7t3v3__inv_2 u_cell (
         .A (A),
         .Y (Y)
     );
 end else if (Target == "behavioral") begin : g_behavioral
-    assign #(BehavioralDelay) Y = A;
+    assign #(BehavioralDelay) Y = ~A;
 end else begin : g_invalid
-    initial $fatal(1, "adpll_cell_delay: unsupported Target \"%s\"", Target);
+    initial $fatal(1, "adpll_cell_inv: unsupported Target \"%s\"", Target);
 end
 
 endmodule

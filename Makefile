@@ -7,7 +7,7 @@ SHELL := /bin/bash
 # 1ns/1ps default timescale via an iverilog command file (process substitution -- no source stub).
 TS    = -c <(printf '+timescale+1ns/1ps\n')
 # Shared core + all loop filters + all DCOs (single-PLL testbench picks one of each via plusdefines)
-# NOTE: rtl/cells/ is intentionally excluded -- the cells select a target library via a `string`
+# NOTE: rtl/tech_cells/ is intentionally excluded -- the cells select a target library via a `string`
 # parameter, which iverilog mis-handles (core-dumps on an unequal-length string compare). The IP
 # sims use the DCOs' behavioural clock model (the cells are a synthesis/slang concern), so they are
 # not needed here. The cells are elaborated by yosys+slang in the chip flow.

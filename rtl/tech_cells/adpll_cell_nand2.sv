@@ -35,7 +35,7 @@
 //   - "behavioral"              : an RTL model with a unit gate delay (so a structural ring
 //                                 oscillates in sim).
 // An unknown Target is a hard error ($fatal). PORT a new PDK by adding a branch here; nothing
-// outside rtl/cells/ changes.
+// outside rtl/tech_cells/ changes.
 //
 // Parameters:
 //   - Target          : target library ("gf180mcu_as_sc_mcu7t3v3" | "behavioral")
