@@ -81,7 +81,13 @@ don't care how the ring is built, only that its frequency falls with `tune_i` �
 compile `sim/ring_dco_behavioral.sv` (a fast `#`-delay clock with the same module/port/param
 interface) instead of `rtl/dco/`, keeping the detector / loop filter / lock detector / CSR — the
 actual digital logic — under test. The ring's real frequency-vs-code curve is physical and is
-verified in **SPICE** (OpenROAD/Magic parasitic extraction from the hardened `ring_dco`).
+verified in **SPICE** — hardened as a macro (`librelane/ring_dco.yaml`), parasitic-extracted by
+Magic, and swept through ngspice. Needs LibreLane + a gf180 PDK + ngspice ≥ 42 (the CI workflow
+`.github/workflows/dco-spice.yml` runs it; locally, inside the toolchain env):
+
+```sh
+make dco-spice DCO=ring_dco_binary SWEEP=0,8,16,32,64,96,127   # freq-vs-code, e.g. code 0 ~= 337 MHz (TT)
+```
 
 The `ring_dco_*` modules carry `(* keep_hierarchy *)` so they survive as a swappable boundary in the
 synthesized netlist: **post-synthesis gate-level sims** substitute the gate ring for

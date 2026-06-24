@@ -1,0 +1,66 @@
+# DCO SPICE characterisation: harden one ring_dco as a macro, extract its parasitic netlist
+# (Magic), and sweep the tune code through ngspice -> frequency-vs-code. This is the DCO sign-off
+# (the ring's frequency is physical, not RTL), driven straight from the .sv via the real flow.
+#
+# Heavy (~10-15 min: a full harden + a transient per code), so it runs on demand and only when the
+# DCO / tech cells / harden config change -- not on every push.
+#
+# The LibreLane container bundles the toolchain (librelane, openroad, magic, yosys, ngspice, ciel);
+# we ciel-enable the pinned gf180 PDK and call `make dco-spice` (which auto-locates the PDK SPICE
+# models under PDK_ROOT, so the ciel layout doesn't matter).
+
+name: DCO SPICE
+
+on:
+  workflow_dispatch:
+    inputs:
+      dco:
+        description: "ring_dco variant to characterise"
+        default: ring_dco_binary
+      sweep:
+        description: "comma-separated tune codes"
+        default: "0,8,16,32,64,96,127"
+  push:
+    paths:
+      - 'rtl/dco/**'
+      - 'rtl/tech_cells/**'
+      - 'librelane/**'
+      - 'Makefile'
+      - '.github/workflows/dco-spice.yml'
+
+jobs:
+  dco-spice:
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/librelane/librelane:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable the gf180 PDK (pinned)
+        run: |
+          ciel enable 019cf7a3e0de79bb0e4b6213758882d283c65816 \
+            --pdk-root "$PWD/.pdk" --pdk-family gf180mcuD --include-libraries all
+
+      - name: Harden ring_dco + ngspice tune sweep
+        run: |
+          make dco-spice \
+            PDK_ROOT="$PWD/.pdk" PDK=gf180mcuD SCL=gf180mcu_as_sc_mcu7t3v3 NGSPICE=ngspice \
+            DCO="${{ github.event.inputs.dco || 'ring_dco_binary' }}" \
+            SWEEP="${{ github.event.inputs.sweep || '0,8,16,32,64,96,127' }}" \
+            | tee dco_freq.txt
+
+      - name: Report freq-vs-code
+        if: always()
+        run: |
+          { echo '### DCO frequency-vs-code (SPICE, extracted)'; echo '```'; \
+            cat dco_freq.txt 2>/dev/null; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload extracted netlist + results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dco-spice
+          path: |
+            dco_freq.txt
+            librelane/runs/*/final/spice/*.spice
+          if-no-files-found: ignore
