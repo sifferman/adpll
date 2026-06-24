@@ -54,7 +54,7 @@ localparam int unsigned NumTaps = (1 << NumTuneBits);
 wire feedback;
 wire node0;
 
-adpll_cell_nand #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_gate (
+adpll_cell_nand2 #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_gate (
     .A (enable_i),
     .B (feedback),
     .Y (node0)
@@ -81,7 +81,7 @@ wire [NumTaps-1:0] tree_level [NumTuneBits+1];
 assign tree_level[0] = tap;
 for (genvar lvl_GEN = 1; lvl_GEN <= NumTuneBits; lvl_GEN++) begin : tree_level_gen
     for (genvar i_GEN = 0; i_GEN < (NumTaps >> lvl_GEN); i_GEN++) begin : tree_mux
-        adpll_cell_mux #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_mux (
+        adpll_cell_mux2 #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_mux (
             .A (tree_level[lvl_GEN-1][2*i_GEN]),
             .B (tree_level[lvl_GEN-1][2*i_GEN + 1]),
             .S (tune_i[lvl_GEN-1]),

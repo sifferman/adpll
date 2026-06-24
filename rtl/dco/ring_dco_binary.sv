@@ -55,7 +55,7 @@ module ring_dco_binary #(
 wire feedback;
 wire [NumTuneBits:0] node;
 
-adpll_cell_nand #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_gate (
+adpll_cell_nand2 #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_gate (
     .A (enable_i),
     .B (feedback),
     .Y (node[0])
@@ -75,7 +75,7 @@ for (genvar i_GEN = 0; i_GEN < NumTuneBits; i_GEN++) begin : delay_segment
             .Y (d[2*j_GEN + 2])
         );
     end
-    adpll_cell_mux #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_sel (
+    adpll_cell_mux2 #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_sel (
         .A (node[i_GEN]),
         .B (d[2*NumStages]),
         .S (tune_i[i_GEN]),

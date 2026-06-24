@@ -24,14 +24,14 @@
 // OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-// adpll_cell_nand
+// adpll_cell_mux2
 //
-// 2-input NAND (Y = ~(A & B)). In the ring DCOs this is the gating gate: it injects enable and
-// supplies the single inversion that sustains oscillation (B = ring feedback). Ports mirror the
-// gf180 cell (A, B, Y) so the wrapper is drop-in. The implementation is chosen by the `Target`
-// string parameter, NOT by a `define:
+// 2:1 multiplexer (Y = S ? B : A). In the ring DCOs it selects whether a delay segment is inserted
+// (S = 1, Y = B = delayed path) or bypassed (S = 0, Y = A). Ports mirror the gf180 cell (A, B, S, Y)
+// so the wrapper is drop-in. The implementation is chosen by the `Target` string parameter, NOT by
+// a `define:
 //   - "gf180mcu_as_sc_mcu7t3v3" : the gf180 3.3 V standard cell, (* keep *)/(* dont_touch *) so the
-//                                 optimiser does not dissolve the ring's combinational loop.
+//                                 optimiser does not dissolve the ring path.
 //   - "behavioral"              : an RTL model with a unit gate delay (so a structural ring
 //                                 oscillates in sim).
 // An unknown Target is a hard error ($fatal). PORT a new PDK by adding a branch here; nothing
@@ -41,29 +41,33 @@
 //   - Target          : target library ("gf180mcu_as_sc_mcu7t3v3" | "behavioral")
 //   - BehavioralDelay : behavioral gate delay (ignored for a real PDK cell)
 // Ports:
-//   - A, B : inputs
-//   - Y    : output (Y = ~(A & B))
+//   - A : input selected when S = 0
+//   - B : input selected when S = 1
+//   - S : select
+//   - Y : output (Y = S ? B : A)
 
-module adpll_cell_nand #(
+module adpll_cell_mux2 #(
     parameter string   Target          = "behavioral",
     parameter realtime BehavioralDelay = 0.1ns
 ) (
     input  wire A,
     input  wire B,
+    input  wire S,
     output wire Y
 );
 
 if (Target == "gf180mcu_as_sc_mcu7t3v3") begin : g_gf180mcu_as_sc_mcu7t3v3
     (* keep *) (* dont_touch = "true" *)
-    gf180mcu_as_sc_mcu7t3v3__nand2_2 u_cell (
+    gf180mcu_as_sc_mcu7t3v3__mux2_2 u_cell (
         .A (A),
         .B (B),
+        .S (S),
         .Y (Y)
     );
 end else if (Target == "behavioral") begin : g_behavioral
-    assign #(BehavioralDelay) Y = ~(A & B);
+    assign #(BehavioralDelay) Y = S ? B : A;
 end else begin : g_invalid
-    initial $fatal(1, "adpll_cell_nand: unsupported Target \"%s\"", Target);
+    initial $fatal(1, "adpll_cell_mux2: unsupported Target \"%s\"", Target);
 end
 
 endmodule

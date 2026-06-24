@@ -60,7 +60,7 @@ end
 wire feedback;
 wire [NumUnits:0] node;
 
-adpll_cell_nand #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_gate (
+adpll_cell_nand2 #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_gate (
     .A (enable_i),
     .B (feedback),
     .Y (node[0])
@@ -77,7 +77,7 @@ for (genvar k_GEN = 0; k_GEN < NumUnits; k_GEN++) begin : delay_unit
         .Y (delayed)
     );
     // Insert this unit's delay when its thermometer bit is set, else bypass.
-    adpll_cell_mux #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_sel (
+    adpll_cell_mux2 #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_sel (
         .A (node[k_GEN]),
         .B (delayed),
         .S (unit_enable[k_GEN]),

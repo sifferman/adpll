@@ -67,7 +67,7 @@ wire [NumFineBits-1:0]   fine_code   = tune_i[NumFineBits-1:0];
 wire feedback;
 wire [NumCoarseUnits:0] coarse_node;
 
-adpll_cell_nand #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_gate (
+adpll_cell_nand2 #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_gate (
     .A (enable_i),
     .B (feedback),
     .Y (coarse_node[0])
@@ -87,7 +87,7 @@ for (genvar k_GEN = 0; k_GEN < NumCoarseUnits; k_GEN++) begin : coarse_unit
             .Y (d[2*j_GEN + 2])
         );
     end
-    adpll_cell_mux #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_sel (
+    adpll_cell_mux2 #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_sel (
         .A (coarse_node[k_GEN]),
         .B (d[2*CoarsePairs]),
         .S (k_GEN < coarse_code),
@@ -108,7 +108,7 @@ for (genvar k_GEN = 0; k_GEN < NumFineUnits; k_GEN++) begin : fine_unit
         .A (mid),
         .Y (delayed)
     );
-    adpll_cell_mux #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_sel (
+    adpll_cell_mux2 #(.Target("gf180mcu_as_sc_mcu7t3v3")) u_sel (
         .A (fine_node[k_GEN]),
         .B (delayed),
         .S (k_GEN < fine_code),

@@ -40,7 +40,7 @@ wants directly (see `sim/tb_adpll.v`).
   external, so the *same* `pi` filter closes both the linear FLL (behind `adpll_freq_detector`)
   and the type-II phase loop (behind `adpll_phase_detector`) — only the widths/gains differ.
 - **DCOs** (`rtl/dco/`) — `binary`, `thermometer`, `muxtap`, `coarsefine` ring oscillators.
-- **Cells** (`rtl/cells/`) — `adpll_cell_delay`/`_inv`/`_nand`/`_mux`, the only PDK-specific
+- **Cells** (`rtl/cells/`) — `adpll_cell_delay`/`_inv`/`_nand2`/`_mux2`, the only PDK-specific
   primitives. The rings and TDC instantiate these wrappers, not PDK cells, so retargeting a PDK
   means reimplementing just this dir (see *Portability*).
 - **CSR** (`rtl/axi/`) — `s_axi_adpll_csr`, a single-PLL AXI4-Lite control/status block (enable/mul/div
@@ -55,7 +55,7 @@ array from these blocks) — this repo ships the reusable parameterizable parts.
 ```
 rtl/             adpll_freq_counter, adpll_freq_detector, adpll_phase_detector,
                  adpll_lock_detector, adpll_tdc
-rtl/cells        adpll_cell_delay / inv / nand / mux -- the PDK-specific primitives (THE retarget seam)
+rtl/cells        adpll_cell_delay / inv / nand2 / mux2 -- the PDK-specific primitives (THE retarget seam)
 rtl/loop_filter  bangbang / pi / gearshift loop filters
 rtl/dco          binary / thermometer / muxtap / coarsefine ring DCOs
 rtl/axi          s_axi_adpll_csr (AXI4-Lite control/status)
@@ -81,7 +81,7 @@ truth = the `.sv`); the former hand-written netlist generator has been removed.
 ## Portability
 
 Every PDK-specific primitive is isolated in **`rtl/cells/`** — the single retarget seam. The ring
-DCOs and the TDC delay line instantiate only these wrappers (`adpll_cell_inv`/`_nand`/`_mux` in the
+DCOs and the TDC delay line instantiate only these wrappers (`adpll_cell_inv`/`_nand2`/`_mux2` in the
 rings; `adpll_cell_delay` in the TDC, ports mirroring the gf180 cells), never a PDK cell directly.
 Each wrapper picks its implementation from a `Target` **string parameter** (not a `` `define ``): the
 DCOs pass `Target="gf180mcu_as_sc_mcu7t3v3"` (the gf180 3.3 V cell, `inv_2`/`nand2_2`/`mux2_2`/
