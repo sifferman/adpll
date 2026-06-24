@@ -70,8 +70,8 @@ module adpll_proportionalintegral_coarsefine #(
 
 wire signed [LoopFilterErrorWidth-1:0] error;
 wire                                   valid;
-wire [DcoNumTuneBits-1:0]              tune;
-wire [DcoNumTuneBits-1:0]              lock_sample;
+wire [DcoNumTuneBits-1:0] dco_tune;
+wire [DcoNumTuneBits-1:0] lock_detector_sample;
 wire                                   dco_clk;
 
 // detector: DCO edges over a ref_div_i window vs ref_mul_i -> signed frequency error
@@ -99,8 +99,8 @@ adpll_loop_filter_proportionalintegral #(
     .enable_i     (enable_i),
     .valid_i      (valid),
     .error_i      (error),
-    .tune_o       (tune),
-    .lock_sample_o(lock_sample)
+    .tune_o       (dco_tune),
+    .lock_sample_o(lock_detector_sample)
 );
 
 // lock detect: watches the settled tune sample
@@ -113,7 +113,7 @@ adpll_lock_detector #(
     .rst_ni         (rst_ni),
     .enable_i       (enable_i),
     .sample_valid_i (valid),
-    .tuning_sample_i(lock_sample),
+    .tuning_sample_i(lock_detector_sample),
     .lock_o         (lock_o)
 );
 
@@ -122,7 +122,7 @@ ring_dco_coarsefine #(
     .Target("gf180mcu_as_sc_mcu7t3v3")
 ) ring_dco_coarsefine (
     .enable_i(enable_i),
-    .tune_i  (tune),
+    .tune_i  (dco_tune),
     .clk_o   (dco_clk)
 );
 
@@ -136,7 +136,7 @@ adpll_post_divider #(
     .clk_o   (clk_o)
 );
 
-assign debug_dco_tune_o = tune;
+assign debug_dco_tune_o = dco_tune;
 assign debug_dco_clk_o  = dco_clk;
 
 endmodule
