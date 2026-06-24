@@ -73,6 +73,8 @@ NGSPICE     ?= ngspice
 PDK_NGSPICE ?= $(shell find $(PDK_ROOT) -type d -path '*/$(PDK)/libs.tech/ngspice' 2>/dev/null | head -1)
 .PHONY: dco-spice
 dco-spice: ## Harden a ring_dco macro + ngspice tune sweep (freq-vs-code). Needs LibreLane/PDK/ngspice.
+	@test -n "$(PDK_NGSPICE)" || { echo "ERROR: PDK_NGSPICE empty -- no '*/$(PDK)/libs.tech/ngspice' under PDK_ROOT=$(PDK_ROOT). Is the PDK enabled?"; exit 1; }
+	@echo "PDK_NGSPICE = $(PDK_NGSPICE)"
 	librelane librelane/ring_dco.yaml --pdk $(PDK) --pdk-root $(PDK_ROOT) --scl $(SCL) -c DESIGN_NAME=$(DCO)
 	python3 librelane/dco_freq.py \
 		--extracted $$(ls -td librelane/runs/*/final/spice/$(DCO).spice | head -1) \
