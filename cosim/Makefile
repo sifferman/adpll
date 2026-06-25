@@ -52,7 +52,10 @@ else
   DCONAME  := $(word 3,$(subst _, ,$(ADPLL)))
   DETECTOR := adpll_freq_detector
   REF_MHZ  ?= 200
-  TSTOP    ?= 1000
+  # The gear-shifting loop filter converges much more slowly (binary DCO locks at ~1626ns @ typical,
+  # later at the slow corner); the other filters lock by ~670ns. Give gearshift a long window, the rest
+  # a modest one (with corner margin).
+  TSTOP    ?= $(if $(findstring gearshift,$(ADPLL)),3000,1500)
 endif
 RINGDCO := ring_dco_$(DCONAME)
 

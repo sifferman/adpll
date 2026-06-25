@@ -26,6 +26,9 @@ TB_TEMPLATE = """\
 .lib $PDK_ROOT/gf180mcuD/libs.tech/ngspice/sm141064.ngspice {corner}
 .include ring.spice
 .temp 25
+* KLU direct linear solver (ngspice is built with it): much faster matrix factorization than the
+* default SPARSE 1.3 on this gate netlist -- same solution, just faster.
+.options KLU
 Vdd VDD 0 {vdd}
 Vss VSS 0 0
 
@@ -87,7 +90,7 @@ TB_TEMPLATE_PHASE = """\
 * Trade accuracy for speed: the 63-tap TDC delay line switching at hundreds of MHz is the runtime
 * bottleneck. Looser tolerances + bigger timesteps + device bypass cut the cost; the TDC phase is
 * coarse (~2^PhaseWidth levels) so it tolerates this. (FLL deck keeps the defaults -- already fast.)
-.options reltol=1e-2 abstol=1e-8 vntol=1e-3 chgtol=1e-12 trtol=50 bypass=1 gmin=1e-9 itl4=200 maxord=2
+.options KLU reltol=1e-2 abstol=1e-8 vntol=1e-3 chgtol=1e-12 trtol=50 bypass=1 gmin=1e-9 itl4=200 maxord=2
 Vdd VDD 0 {vdd}
 Vss VSS 0 0
 

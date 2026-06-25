@@ -40,7 +40,7 @@ jobs:
           - adpll_phase_proportionalintegral_thermometer
           - adpll_phase_proportionalintegral_muxtap
           - adpll_phase_proportionalintegral_coarsefine
-        corner: [typical]
+        corner: [typical, ss, ff, sf, fs]
     steps:
       - name: Maximize build space
         uses: AdityaGarg8/remove-unwanted-software@v5
