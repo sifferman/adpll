@@ -116,10 +116,12 @@ cosim: $(SYNTH_VVP) $(ANALOG)
 	 | tee $(notdir $(LOG)) \
 	 | grep -aiE "t_lock|error|aborted" || true
 	@t=$$(grep -aoE "t_lock *= *[0-9.eE+-]+" $(LOG) | head -1); \
-	 if [ -n "$$t" ]; then \
-	   echo "$(ADPLL) @ $(CORNER): LOCKED ($$t)"; \
+	 h=$$(grep -aoE "lock_held *= *[0-9.eE+-]+" $(LOG) | head -1 | grep -oE "[0-9.eE+-]+$$"); \
+	 held=$$(awk "BEGIN{print (($${h:-0}+0) > 1.65) ? 1 : 0}"); \
+	 if [ -n "$$t" ] && [ "$$held" = "1" ]; then \
+	   echo "$(ADPLL) @ $(CORNER): LOCKED ($$t, sustained v(lock)=$${h}V)"; \
 	 else \
-	   echo "$(ADPLL) @ $(CORNER): NO-LOCK"; \
+	   echo "$(ADPLL) @ $(CORNER): NO-LOCK (t_lock='$$t' lock_held='$${h:-none}'V)"; \
 	   exit 1; \
 	 fi
 

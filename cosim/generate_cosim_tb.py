@@ -38,10 +38,15 @@ a_loop [{ins}]
 X_dco VDD VSS dco_clk en_a tia0 tia1 tia2 tia3 tia4 tia5 tia6 {ring_subckt}
 Cload dco_clk 0 2f
 
-* ---- sources: ref clock, reset (active-low), enable, and the const-1/const-0 rails ----
+* ---- sources: ref clock, enable, reset (active-low), const-1/const-0 rails ----
+* Enable the ring BEFORE releasing reset: the gf180 DFF model only resets on a clock edge taken while
+* reset is asserted (its async-reset fires on a reset *edge*, which never happens since reset is low
+* from t=0). The ref-clocked flops reset fine (ref runs from t=0), but the DCO-domain edge counter is
+* clocked by dco_clk -- so the ring must be oscillating while reset is still low, or those flops stay X
+* forever (and X poisons the whole loop). Hence enable at 20 ns, release reset at 60 ns.
 Vref refa 0 PULSE(0 {vdd} 0 0.1n 0.1n {pw:.3f}n {tper:.3f}n)
-Vrst rsta 0 PWL(0 0 30n 0 30.1n {vdd})
-Ven  en_a 0 PWL(0 0 40n 0 40.1n {vdd})
+Ven  en_a 0 PWL(0 0 20n 0 20.1n {vdd})
+Vrst rsta 0 PWL(0 0 60n 0 60.1n {vdd})
 Vone onea 0 {vdd}
 Vzero zeroa 0 0
 
@@ -56,7 +61,11 @@ a_dac_lock [lock_o] [lock_a] dacm
 .tran {tstep_ps}p {tstop_ns}n uic
 .control
 run
-meas tran t_lock when v(lock_a)={vth:.3f} rise=1
+* lock = first lock_a rise after reset releases (td past the 60ns reset window, so a startup
+* transient can't be mistaken for lock); lock_held confirms it's still locked at the end (real,
+* sustained lock -- not a momentary blip). The report treats the run as LOCKED only if both hold.
+meas tran t_lock when v(lock_a)={vth:.3f} rise=1 td=65n
+meas tran lock_held find v(lock_a) at={lock_check:.1f}n
 .endc
 .end"""
 
@@ -96,10 +105,13 @@ Cload dco_clk 0 2f
 * ---- the TDC's self-reported coverage flag -- the loop leaves it unconnected, so it just dangles. ----
 X_tdc VDD VSS refa dco_clk pv_a tpa0 tpa1 tpa2 tpa3 tpa4 tpa5 rsta {tdc_subckt}
 
-* ---- sources: ref clock, reset (active-low), enable, const-1/const-0 rails ----
+* ---- sources: ref clock, enable, reset (active-low), const-1/const-0 rails ----
+* Enable BEFORE releasing reset (see FLL deck): the gf180 DFF resets only on a clock edge taken while
+* reset is low, and the DCO-domain edge counter / TDC flops are clocked by dco_clk -- so the ring must
+* run while reset is asserted or those flops stay X forever. Enable at 20 ns, release reset at 60 ns.
 Vref refa 0 PULSE(0 {vdd} 0 0.1n 0.1n {pw:.3f}n {tper:.3f}n)
-Vrst rsta 0 PWL(0 0 30n 0 30.1n {vdd})
-Ven  ena  0 PWL(0 0 40n 0 40.1n {vdd})
+Ven  ena  0 PWL(0 0 20n 0 20.1n {vdd})
+Vrst rsta 0 PWL(0 0 60n 0 60.1n {vdd})
 Vone onea 0 {vdd}
 Vzero zeroa 0 0
 
@@ -115,7 +127,11 @@ a_dac_lock [lock_o] [lock_a] dacm
 .tran {tstep_ps}p {tstop_ns}n uic
 .control
 run
-meas tran t_lock when v(lock_a)={vth:.3f} rise=1
+* lock = first lock_a rise after reset releases (td past the 60ns reset window, so a startup
+* transient can't be mistaken for lock); lock_held confirms it's still locked at the end (real,
+* sustained lock -- not a momentary blip). The report treats the run as LOCKED only if both hold.
+meas tran t_lock when v(lock_a)={vth:.3f} rise=1 td=65n
+meas tran lock_held find v(lock_a) at={lock_check:.1f}n
 .endc
 .end"""
 
@@ -144,9 +160,14 @@ def main():
     a = ap.parse_args()
 
     tper = 1000.0 / a.ref_mhz
+    # adc_bridge thresholds: use a SINGLE threshold (in_low == in_high == vdd/2), not a wide band. A
+    # wide band makes the bridge emit X while a signal slews through it, and Icarus treats 0->x->1 as
+    # TWO posedges -> the DCO edge counter double-counts (the ring would lock at half the target). A
+    # single threshold digitizes cleanly: one 0->1 per real edge.
     common = dict(ref_mhz=a.ref_mhz, corner=a.corner, vvp=a.vvp, vdd=a.vdd, ring_subckt=a.ring_subckt,
-                  pw=tper / 2.0 - 0.1, tper=tper, in_low=a.vdd / 3, in_high=2 * a.vdd / 3,
-                  vth=a.vdd / 2, tstep_ps=a.tstep_ps, tstop_ns=a.tstop_ns)
+                  pw=tper / 2.0 - 0.1, tper=tper, in_low=a.vdd / 2, in_high=a.vdd / 2,
+                  vth=a.vdd / 2, tstep_ps=a.tstep_ps, tstop_ns=a.tstop_ns,
+                  lock_check=a.tstop_ns - 20.0)
     outs = ["clk_o", "lock_o"] + [f"tune_{i}" for i in range(6, -1, -1)] + ["debug_dco_clk_o"]
 
     if a.phase:
