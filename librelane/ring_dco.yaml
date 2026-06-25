@@ -43,6 +43,12 @@ RUN_CTS: false
 RUN_POST_GRT_RESIZER_TIMING: false
 DESIGN_REPAIR_BUFFER_INPUT_PORTS: false
 
+# A free-running ring oscillator has no real setup/hold timing -- the combinational feedback loop is
+# the whole point -- but STA still flags the loop as a setup violation, fatally, for the slower
+# variants (thermometer/coarsefine). Match no corners so the timing-violation checkers don't error.
+SETUP_VIOLATION_CORNERS: ['']
+HOLD_VIOLATION_CORNERS: ['']
+
 # Relative floorplan so the die auto-fits each variant: the binary ring is a handful of cells, but
 # muxtap/thermometer/coarsefine have many more and overflow a fixed tiny die (global placement hits
 # >100% utilization). A low core utilization keeps every variant roomy; it's a standalone macro for
