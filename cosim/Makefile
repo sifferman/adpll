@@ -46,16 +46,17 @@ ifeq ($(IS_PHASE),1)
   DCONAME  := $(word 4,$(subst _, ,$(ADPLL)))
   DETECTOR := adpll_phase_detector
   REF_MHZ  ?= 50
-  TSTOP    ?= 1200
+  # Phase configs lock by ~261ns (real settling) at every corner and sustain; 800ns gives a generous
+  # post-lock window for the sustained-lock check while keeping the (slow) phase cosim short.
+  TSTOP    ?= 800
 else
   FILTER   := $(word 2,$(subst _, ,$(ADPLL)))
   DCONAME  := $(word 3,$(subst _, ,$(ADPLL)))
   DETECTOR := adpll_freq_detector
   REF_MHZ  ?= 200
-  # The gear-shifting loop filter converges much more slowly (binary DCO locks at ~1626ns @ typical,
-  # later at the slow corner); the other filters lock by ~670ns. Give gearshift a long window, the rest
-  # a modest one (with corner margin).
-  TSTOP    ?= $(if $(findstring gearshift,$(ADPLL)),3000,1500)
+  # Measured across all 5 corners: non-gearshift FLL locks by ~750ns; gearshift_binary by ~1667ns.
+  # Give gearshift a 2200ns window, the rest 1200ns (both with corner margin).
+  TSTOP    ?= $(if $(findstring gearshift,$(ADPLL)),2200,1200)
 endif
 RINGDCO := ring_dco_$(DCONAME)
 
