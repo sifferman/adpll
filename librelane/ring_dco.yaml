@@ -43,10 +43,12 @@ RUN_CTS: false
 RUN_POST_GRT_RESIZER_TIMING: false
 DESIGN_REPAIR_BUFFER_INPUT_PORTS: false
 
-# Tiny fixed floorplan -- a handful of cells.
-FP_SIZING: absolute
-DIE_AREA: [0, 0, 80, 80]
-CORE_AREA: [5, 5, 75, 75]
+# Relative floorplan so the die auto-fits each variant: the binary ring is a handful of cells, but
+# muxtap/thermometer/coarsefine have many more and overflow a fixed tiny die (global placement hits
+# >100% utilization). A low core utilization keeps every variant roomy; it's a standalone macro for
+# SPICE extraction, so the extra empty area costs nothing.
+FP_SIZING: relative
+FP_CORE_UTIL: 25
 PL_TARGET_DENSITY_PCT: 40
 
 # The ring is kept intact by the RTL attributes: (* keep_hierarchy *) on the module and

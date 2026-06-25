@@ -33,10 +33,12 @@ RUN_CTS: false
 RUN_POST_GRT_RESIZER_TIMING: false
 DESIGN_REPAIR_BUFFER_INPUT_PORTS: false
 
-# 2^6-1 = 63 delay taps + 63 sampler flops + a popcount adder tree -- bigger than the ring.
-FP_SIZING: absolute
-DIE_AREA: [0, 0, 180, 180]
-CORE_AREA: [5, 5, 175, 175]
+# 2^6-1 = 63 delay taps + 63 sampler flops + the ratiometric decode -- bigger than the ring, and the
+# exact cell count varies with PhaseWidth/DelayCellsBetweenSamples, so size the die relatively (a fixed
+# die overflowed: global placement hit >100% utilization). Low util keeps it roomy; it's a standalone
+# extraction macro, so empty area is free.
+FP_SIZING: relative
+FP_CORE_UTIL: 25
 PL_TARGET_DENSITY_PCT: 35
 
 # Magic-based SPICE extraction (the netlist we feed to ngspice). Parasitic R/C if the PDK supports
