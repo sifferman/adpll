@@ -46,6 +46,8 @@ ifeq ($(IS_PHASE),1)
   DCONAME  := $(word 4,$(subst _, ,$(ADPLL)))
   DETECTOR := adpll_phase_detector
   REF_MHZ  ?= 50
+  # target F_DCO = fcw / 2^TdcPhaseWidth * F_ref  (TdcPhaseWidth=6 -> /64)
+  TARGET_EXPR := $(FCW)/64*$(REF_MHZ)
   # Phase configs lock by ~261ns (real settling) at every corner and sustain; 800ns gives a generous
   # post-lock window for the sustained-lock check while keeping the (slow) phase cosim short.
   TSTOP    ?= 800
@@ -54,6 +56,8 @@ else
   DCONAME  := $(word 3,$(subst _, ,$(ADPLL)))
   DETECTOR := adpll_freq_detector
   REF_MHZ  ?= 200
+  # target F_DCO = mul/div * F_ref
+  TARGET_EXPR := $(MUL)/$(DIV)*$(REF_MHZ)
   # Measured across all 5 corners: non-gearshift FLL locks by ~750ns; gearshift_binary by ~1667ns.
   # Give gearshift a 2200ns window, the rest 1200ns (both with corner margin).
   TSTOP    ?= $(if $(findstring gearshift,$(ADPLL)),2200,1200)
@@ -119,13 +123,16 @@ cosim: $(SYNTH_VVP) $(ANALOG)
 	  ngspice -b $(notdir $(TB)) 2>&1 \
 	 | tee $(notdir $(LOG)) \
 	 | grep -aiE "t_lock|error|aborted" || true
-	@t=$$(grep -aoE "t_lock *= *[0-9.eE+-]+" $(LOG) | head -1); \
-	 h=$$(grep -aoE "lock_held *= *[0-9.eE+-]+" $(LOG) | head -1 | grep -oE "[0-9.eE+-]+$$"); \
-	 held=$$(awk "BEGIN{print (($${h:-0}+0) > 1.65) ? 1 : 0}"); \
-	 if [ -n "$$t" ] && [ "$$held" = "1" ]; then \
-	   echo "$(ADPLL) @ $(CORNER): LOCKED ($$t, sustained v(lock)=$${h}V)"; \
+	@t=$$(grep -aoE "t_lock *= *[0-9.eE+-]+" $(LOG) | head -1 | grep -oE "[0-9.eE+-]+$$"); \
+	 la=$$(grep -aoE "lock_avg *= *[0-9.eE+-]+" $(LOG) | head -1 | grep -oE "[0-9.eE+-]+$$"); \
+	 fp=$$(grep -aoE "f_per *= *[0-9.eE+-]+" $(LOG) | head -1 | grep -oE "[0-9.eE+-]+$$"); \
+	 tgt=$$(awk "BEGIN{printf \"%.1f\", $(TARGET_EXPR)}"); \
+	 r=$$(awk "BEGIN{fp=$${fp:-0}+0; f=(fp>0)?30/fp/1e6:0; t=$$tgt+0; d=f-t; d=(d<0?-d:d); printf \"%.1f %d\", f, (t>0 && f>0 && d/t<0.10)?1:0}"); \
+	 f=$${r% *}; ok=$${r#* }; \
+	 if [ -n "$$t" ] && [ "$$ok" = "1" ]; then \
+	   echo "$(ADPLL) @ $(CORNER): LOCKED (t_lock=$${t}s, F_DCO=$${f}MHz vs $${tgt}MHz target, lock_avg=$${la}V)"; \
 	 else \
-	   echo "$(ADPLL) @ $(CORNER): NO-LOCK (t_lock='$$t' lock_held='$${h:-none}'V)"; \
+	   echo "$(ADPLL) @ $(CORNER): NO-LOCK (t_lock='$${t:-none}'s F_DCO='$${f}'MHz target='$${tgt}'MHz lock_avg='$${la:-none}'V)"; \
 	   exit 1; \
 	 fi
 

@@ -68,7 +68,8 @@ run
 * transient can't be mistaken for lock); lock_held confirms it's still locked at the end (real,
 * sustained lock -- not a momentary blip). The report treats the run as LOCKED only if both hold.
 meas tran t_lock when v(lock_a)={vth:.3f} rise=1 td=65n
-meas tran lock_held find v(lock_a) at={lock_check:.1f}n
+meas tran lock_avg avg v(lock_a) from={lock_from:.1f}n to={lock_check:.1f}n
+meas tran f_per trig v(dco_clk) val={vth:.3f} rise=2 td={lock_from:.1f}n targ v(dco_clk) val={vth:.3f} rise=32 td={lock_from:.1f}n
 .endc
 .end"""
 
@@ -134,7 +135,8 @@ run
 * transient can't be mistaken for lock); lock_held confirms it's still locked at the end (real,
 * sustained lock -- not a momentary blip). The report treats the run as LOCKED only if both hold.
 meas tran t_lock when v(lock_a)={vth:.3f} rise=1 td=65n
-meas tran lock_held find v(lock_a) at={lock_check:.1f}n
+meas tran lock_avg avg v(lock_a) from={lock_from:.1f}n to={lock_check:.1f}n
+meas tran f_per trig v(dco_clk) val={vth:.3f} rise=2 td={lock_from:.1f}n targ v(dco_clk) val={vth:.3f} rise=32 td={lock_from:.1f}n
 .endc
 .end"""
 
@@ -170,7 +172,7 @@ def main():
     common = dict(ref_mhz=a.ref_mhz, corner=a.corner, vvp=a.vvp, vdd=a.vdd, ring_subckt=a.ring_subckt,
                   pw=tper / 2.0 - 0.1, tper=tper, in_low=a.vdd / 2, in_high=a.vdd / 2,
                   vth=a.vdd / 2, tstep_ps=a.tstep_ps, tstop_ns=a.tstop_ns,
-                  lock_check=a.tstop_ns - 20.0)
+                  lock_check=a.tstop_ns - 20.0, lock_from=a.tstop_ns - 250.0)
     outs = ["clk_o", "lock_o"] + [f"tune_{i}" for i in range(6, -1, -1)] + ["debug_dco_clk_o"]
 
     if a.phase:
