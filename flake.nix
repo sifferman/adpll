@@ -32,9 +32,19 @@
               devshell.overlays.default
               librelane.overlays.default
               # The pinned librelane rev isn't in the fossi cache, so CI builds it from source and runs
-              # its pytest checkPhase -- which fails in the GitHub nix sandbox (test_tclstep.py::test_env
-              # -> pyfakefs '/cwd' FileNotFoundError) even though the build itself is fine. Skip the check.
-              (_: prev: { librelane = prev.librelane.overrideAttrs (_: { doCheck = false; }); })
+              # its pytest checkPhase -- which fails in the GitHub nix sandbox (test_tclstep.py::test_env)
+              # even though the build itself is fine (145 passed, 1 error). doCheck isn't hash-affecting
+              # for this package, so dontUsePytestCheck=true is what actually disables the phase. We don't
+              # need to re-test librelane in cosim CI, only to install it. librelane-shell bundles
+              # python3.pkgs.librelane (not the top-level alias), so override it in the python set; the
+              # fixpoint (create-shell.nix uses final.python3.pkgs.librelane) carries it through .override.
+              (final: prev: {
+                python3 = prev.python3.override (old: {
+                  packageOverrides = prev.lib.composeExtensions
+                    (old.packageOverrides or (_: _: { }))
+                    (_: pyprev: { librelane = pyprev.librelane.overrideAttrs (_: { dontUsePytestCheck = true; }); });
+                });
+              })
             ];
           };
           # nixpkgs ships iverilog 12.0, which predates libvvp. Build iverilog from git master with
