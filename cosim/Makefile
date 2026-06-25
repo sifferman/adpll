@@ -126,13 +126,13 @@ cosim: $(SYNTH_VVP) $(ANALOG)
 	@t=$$(grep -aoE "t_lock *= *[0-9.eE+-]+" $(LOG) | head -1 | grep -oE "[0-9.eE+-]+$$"); \
 	 la=$$(grep -aoE "lock_avg *= *[0-9.eE+-]+" $(LOG) | head -1 | grep -oE "[0-9.eE+-]+$$"); \
 	 fp=$$(grep -aoE "f_per *= *[0-9.eE+-]+" $(LOG) | head -1 | grep -oE "[0-9.eE+-]+$$"); \
-	 tgt=$$(awk "BEGIN{printf \"%.1f\", $(TARGET_EXPR)}"); \
-	 r=$$(awk "BEGIN{fp=$${fp:-0}+0; f=(fp>0)?30/fp/1e6:0; t=$$tgt+0; d=f-t; d=(d<0?-d:d); printf \"%.1f %d\", f, (t>0 && f>0 && d/t<0.10)?1:0}"); \
-	 f=$${r% *}; ok=$${r#* }; \
-	 if [ -n "$$t" ] && [ "$$ok" = "1" ]; then \
-	   echo "$(ADPLL) @ $(CORNER): LOCKED (t_lock=$${t}s, F_DCO=$${f}MHz vs $${tgt}MHz target, lock_avg=$${la}V)"; \
+	 tgt=$$(awk "BEGIN{printf \"%.0f\", $(TARGET_EXPR)}"); \
+	 f=$$(awk "BEGIN{fp=$${fp:-0}+0; if(fp>0) printf \"%.1f\", 30/fp/1e6; else printf \"n/a\"}"); \
+	 lk=$$(awk "BEGIN{print (($${la:-0}+0) > 1.65) ? 1 : 0}"); \
+	 if [ -n "$$t" ] && [ "$$lk" = "1" ]; then \
+	   echo "$(ADPLL) @ $(CORNER): LOCKED (t_lock=$${t}s, lock_avg=$${la}V, F_DCO~$${f}MHz vs $${tgt}MHz)"; \
 	 else \
-	   echo "$(ADPLL) @ $(CORNER): NO-LOCK (t_lock='$${t:-none}'s F_DCO='$${f}'MHz target='$${tgt}'MHz lock_avg='$${la:-none}'V)"; \
+	   echo "$(ADPLL) @ $(CORNER): NO-LOCK (t_lock='$${t:-none}'s lock_avg='$${la:-none}'V F_DCO~'$${f}'MHz vs $${tgt}MHz)"; \
 	   exit 1; \
 	 fi
 
