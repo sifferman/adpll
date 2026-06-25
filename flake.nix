@@ -31,6 +31,10 @@
               nix-eda.overlays.default
               devshell.overlays.default
               librelane.overlays.default
+              # The pinned librelane rev isn't in the fossi cache, so CI builds it from source and runs
+              # its pytest checkPhase -- which fails in the GitHub nix sandbox (test_tclstep.py::test_env
+              # -> pyfakefs '/cwd' FileNotFoundError) even though the build itself is fine. Skip the check.
+              (_: prev: { librelane = prev.librelane.overrideAttrs (_: { doCheck = false; }); })
             ];
           };
           # nixpkgs ships iverilog 12.0, which predates libvvp. Build iverilog from git master with
