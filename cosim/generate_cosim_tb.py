@@ -91,8 +91,10 @@ a_loop [{ins}]
 X_dco VDD VSS dco_clk ena tia0 tia1 tia2 tia3 tia4 tia5 tia6 {ring_subckt}
 Cload dco_clk 0 2f
 
-* ---- TDC (analog): VDD VSS clk_i dco_clk_i phase_o[0..5] rst_ni; samples the ring's phase at ref edge ----
-X_tdc VDD VSS refa dco_clk tpa0 tpa1 tpa2 tpa3 tpa4 tpa5 rsta {tdc_subckt}
+* ---- TDC (analog): extracted .subckt pin order is VDD VSS clk_i dco_clk_i period_valid_o
+* ---- phase_o[0..5] rst_ni; samples the ring's phase at the ref edge. period_valid_o (pv_a) is
+* ---- the TDC's self-reported coverage flag -- the loop leaves it unconnected, so it just dangles. ----
+X_tdc VDD VSS refa dco_clk pv_a tpa0 tpa1 tpa2 tpa3 tpa4 tpa5 rsta {tdc_subckt}
 
 * ---- sources: ref clock, reset (active-low), enable, const-1/const-0 rails ----
 Vref refa 0 PULSE(0 {vdd} 0 0.1n 0.1n {pw:.3f}n {tper:.3f}n)
