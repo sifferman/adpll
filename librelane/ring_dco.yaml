@@ -61,6 +61,14 @@ PL_TARGET_DENSITY_PCT: 40
 # (* keep *)/(* dont_touch *) on the gf180 cells in rtl/tech_cells/.
 
 # Magic-based SPICE extraction (the netlist we feed to ngspice). Parasitic R/C if the PDK supports
-# RCX; otherwise device-level.
+# RCX; otherwise device-level. Needs the GDS, so keep Magic streamout.
 MAGIC_EXT_USE_GDS: true
 RUN_MAGIC_STREAMOUT: true
+
+# We only want the extracted SPICE, not a signoff-clean macro. The post-route signoff steps
+# (KLayout XOR, Magic/KLayout DRC, LVS) run before/after SpiceExtraction and dominate the runtime --
+# skip them so the harden ends as soon as the netlist is extracted.
+RUN_KLAYOUT_XOR: false
+RUN_MAGIC_DRC: false
+RUN_KLAYOUT_DRC: false
+RUN_LVS: false

@@ -48,6 +48,14 @@ FP_CORE_UTIL: 25
 PL_TARGET_DENSITY_PCT: 35
 
 # Magic-based SPICE extraction (the netlist we feed to ngspice). Parasitic R/C if the PDK supports
-# RCX; otherwise device-level.
+# RCX; otherwise device-level. Needs the GDS, so keep Magic streamout.
 MAGIC_EXT_USE_GDS: true
 RUN_MAGIC_STREAMOUT: true
+
+# We only want the extracted SPICE, not a signoff-clean macro. On the 63-tap TDC the post-route
+# signoff steps (KLayout XOR, Magic/KLayout DRC, LVS) dominate the runtime -- skip them so the harden
+# ends as soon as the netlist is extracted. (This was the phase-cosim CI bottleneck.)
+RUN_KLAYOUT_XOR: false
+RUN_MAGIC_DRC: false
+RUN_KLAYOUT_DRC: false
+RUN_LVS: false
