@@ -1,0 +1,33 @@
+# Auto-rerun transiently-failed cosim cells.
+#
+# Each cosim cell provisions a full Nix toolchain over the network (the installer fetches nix from
+# releases.nixos.org, the devshell from cache.nixos.org). A small fraction of cells hit transient
+# GitHub-runner infra failures -- DNS "Try again" / HTTP 416 / dropped connections -- that are
+# unrelated to the design: they die in ~1-2 min, long before the ~25-40 min sim. The failing cells
+# differ run to run, which is the signature of network flakiness rather than a real NO-LOCK.
+#
+# Re-running just the failed jobs clears those blips. A genuine NO-LOCK instead fails consistently
+# across all attempts and still turns the run red, so this masks only transient infra, not bugs.
+name: Rerun failed cosim cells
+
+on:
+  workflow_run:
+    workflows: ["ADPLL cosim (experimental)"]
+    types: [completed]
+
+permissions:
+  actions: write
+
+jobs:
+  rerun:
+    # Only when the cosim run failed, and cap the attempts so a real failure can't loop forever.
+    if: >-
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.run_attempt < 3
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Rerun failed jobs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: gh run rerun ${{ github.event.workflow_run.id }} --failed
