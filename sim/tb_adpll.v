@@ -13,17 +13,26 @@
 // and a 25 MHz reference, mul=1707/div=256 targets tune ~= 20. Reports time-to-lock and the
 // settled tune code, and PASSes if it locks in a sane mid-range code.
 
+// DCO per-half-period jitter in ps; override with -DJITTER_PS=<n>
 `ifndef JITTER_PS
-  `define JITTER_PS 0    // DCO per-half-period jitter in ps; override with -DJITTER_PS=<n>
-`endif
-`ifndef DCO_TABLE
-  `define DCO_TABLE ""   // real freq-vs-code lookup (ps) from SPICE; -DDCO_TABLE=\"file.mem\" to use it
+  `define JITTER_PS 0
 `endif
 // Freq-detector target/window + reference period -- override to match the cosim FLL operating point
 // (e.g. -DMUL_VAL=12 -DDIV_VAL=8 -DCLK_HALF=2.5 reproduces the 300 MHz @ 200 MHz-ref small-window case).
-`ifndef MUL_VAL  `define MUL_VAL  1707 `endif
-`ifndef DIV_VAL  `define DIV_VAL  256  `endif
-`ifndef CLK_HALF `define CLK_HALF 20   `endif
+`ifndef MUL_VAL
+  `define MUL_VAL 1707
+`endif
+`ifndef DIV_VAL
+  `define DIV_VAL 256
+`endif
+`ifndef CLK_HALF
+  `define CLK_HALF 20
+`endif
+// Gear-shift starting gear (step = 1<<MaxGear). The default lives in the filter; override here to
+// study loop stability (e.g. -DGEAR_MAXGEAR=5 reproduces the over-large-step railing on the muxtap).
+`ifndef GEAR_MAXGEAR
+  `define GEAR_MAXGEAR 2
+`endif
 module tb_adpll;
   localparam int unsigned NUM_TUNE = 7;
   localparam int unsigned CNT_W    = 24;        // EdgeCountWidth (mul width)
@@ -53,13 +62,13 @@ module tb_adpll;
   wire                    valid;
 
 `ifdef DCO_THERM
-  ring_dco_thermometer #(.NumTuneBits(NUM_TUNE), .JitterPs(`JITTER_PS), .DcoTable(`DCO_TABLE)) u_dco (
+  ring_dco_thermometer #(.NumTuneBits(NUM_TUNE), .JitterPs(`JITTER_PS)) u_dco (
 `elsif DCO_MUXTAP
-  ring_dco_muxtap #(.NumTuneBits(NUM_TUNE), .JitterPs(`JITTER_PS), .DcoTable(`DCO_TABLE)) u_dco (
+  ring_dco_muxtap #(.NumTuneBits(NUM_TUNE), .JitterPs(`JITTER_PS)) u_dco (
 `elsif DCO_COARSEFINE
-  ring_dco_coarsefine #(.NumTuneBits(NUM_TUNE), .JitterPs(`JITTER_PS), .DcoTable(`DCO_TABLE)) u_dco (
+  ring_dco_coarsefine #(.NumTuneBits(NUM_TUNE), .JitterPs(`JITTER_PS)) u_dco (
 `else
-  ring_dco_binary #(.NumTuneBits(NUM_TUNE), .JitterPs(`JITTER_PS), .DcoTable(`DCO_TABLE)) u_dco (
+  ring_dco_binary #(.NumTuneBits(NUM_TUNE), .JitterPs(`JITTER_PS)) u_dco (
 `endif
       .enable_i(enable),
       .tune_i  (tune),
@@ -80,7 +89,7 @@ module tb_adpll;
 `ifdef CTRL_PROPORTIONALINTEGRAL
   adpll_loop_filter_proportionalintegral        #(.NumTuneBits(NUM_TUNE), .ErrorWidth(ERR_W)) u_flt (
 `elsif CTRL_GEARSHIFT
-  adpll_loop_filter_gearshift #(.NumTuneBits(NUM_TUNE), .ErrorWidth(ERR_W)) u_flt (
+  adpll_loop_filter_gearshift #(.NumTuneBits(NUM_TUNE), .ErrorWidth(ERR_W), .MaxGear(`GEAR_MAXGEAR)) u_flt (
 `else
   adpll_loop_filter_bangbang  #(.NumTuneBits(NUM_TUNE), .ErrorWidth(ERR_W)) u_flt (
 `endif

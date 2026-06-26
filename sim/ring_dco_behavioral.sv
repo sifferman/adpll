@@ -29,42 +29,50 @@
 // SIM-ONLY behavioural models of the ring DCOs. The real DCOs in rtl/dco/ are purely structural
 // (built from rtl/tech_cells/, selected by `Target`) -- correct for synthesis and SPICE, but a
 // structural #-delay ring is slow to simulate and needs string-parameter tooling support. The
-// digital simulations don't care how the ring is built, only that clk_o's frequency falls with
+// digital simulations don't care how the ring is built, only how clk_o's frequency moves with
 // tune_i; the ring's real frequency-vs-code curve is a physical property verified in SPICE.
 //
 // So the boundary is the DCO: testbenches compile THIS file instead of rtl/dco/ (and skip
 // rtl/tech_cells/), keeping the detector / loop filter / lock detector / CSR -- the actual digital
 // logic -- under test on stock Icarus, fast. Each module mirrors its structural namesake's port
-// list and parameters (Target is accepted and ignored) so a macro instantiates either interchangeably.
+// list and parameters (Target is accepted and ignored).
 //
-// half_period = 1.0ns + 0.1ns*tune_i (illustrative); >= 1.0ns > 0 so there is never a zero-delay
-// loop. The numbers are not the silicon curve -- SPICE gives that.
+// === closed-form ring law (replaces the old smooth 1.0+0.1*tune curve and the readmem table) ===
+// A ring oscillator's half-period is t_stage * N_stages, and each DCO variant tunes one of those:
+// the mux-tap/thermometer rings move N_stages with the code (half-period ~LINEAR in tune -- the
+// extracted mux-tap ring fits Hp = 1346 + 87*tune ps to ~1 ps RMS, and stops oscillating past its
+// tap range), while the binary/coarse-fine rings load a fixed-length ring (half-period rises with
+// the loaded code). So each module carries a closed-form law with a few physically-named,
+// SPICE-calibrated parameters (HpBasePs, HpSlopePs, TuneOscMax) instead of a lookup table.
+// NB: a monotonic closed-form law does NOT reproduce the binary ring's real multi-mode
+// non-monotonicity -- that is a silicon pathology only the measured curve captures, and (verified)
+// it did not improve the gate-level-cosim match, so it is intentionally dropped here.
 //
-// JitterPs: optional per-half-period timing jitter, uniform in +-JitterPs picoseconds (default 0 =
-// ideal clock). This models the analog ring's cycle-to-cycle jitter, which adds noise to the freq
-// detector's edge count -- the effect the smooth ideal model lacks. Used to study how the loop
-// filters tolerate a noisy DCO (e.g. why gearshift, with no integrator to average the noisy error
-// sign, degrades on a jittery ring while the integrating bang-bang does not).
-
-// DcoTable: optional path to a $readmemh half-period(ps) lookup (128 codes) from the real extracted-
-// ring SPICE sweep (sim/dco_table_from_sweep.py). When set, the ring REPLAYS the measured freq-vs-code
-// -- multi-mode non-monotonicity, steep regions, and NO-OSC dead codes (table entry 0 = ring stalled)
-// -- so the behavioural sim behaves like the cosim. When empty (default), the smooth illustrative
-// curve (1.0+0.1*tune ns) is used.
-`define ADPLL_RING_DCO_BEHAVIOURAL(NAME)                                       \
+// === why this makes the bang-bang "stutter" emerge instead of being scripted ===
+// clk_o is a FREE-RUNNING oscillator, NOT phase-locked to the reference window the frequency
+// detector counts over. So a given frequency lands as N edges in one window and N+1 in the next
+// depending on sub-cycle phase -> the detector's error count dithers +-1 -> the bang-bang error
+// sign flips -> the loop settles into a +-1 LSB limit cycle. That dither is the cosim's "stutter",
+// and here it falls out of an honest free-running oscillator + the real (steep, for the mux-tap)
+// curve through the same detector the loop uses -- not from any added logic. The gate-level cosim's
+// ring is itself a deterministic transient (no thermal noise), so its stutter is exactly this
+// quantisation effect; JitterPs optionally adds +-ps cycle-to-cycle jitter to study a genuinely
+// noisy ring, but it is not needed for the stutter (default 0 = noise-free, like the cosim).
+//
+// Fidelity boundary: this reproduces the dither limit cycle (the "stutter") from the right
+// mechanism, but NOT the gate-level acquisition transients -- the cosim's extra loop latency (the
+// edge counter's clock-domain-crossing synchroniser) is what let an over-large gear-shift step
+// overshoot into the rail, and that is not modelled by a free-running DCO. The gate-level cosim
+// remains the sign-off environment.
+`define ADPLL_RING_DCO_BEHAVIOURAL                                             \
     logic    clk_r = 1'b1;                                                     \
     realtime half_period;                                                      \
-    integer  hp_tbl [0:(1<<NumTuneBits)-1];                                    \
-    integer  use_tbl = 0;                                                      \
-    initial if (DcoTable != "") begin $readmemh(DcoTable, hp_tbl); use_tbl = 1; end \
     always begin                                                              \
-        if (!enable_i) begin                                                   \
-            clk_r = 1'b1; #(1.0ns);                                            \
-        end else if (use_tbl && hp_tbl[tune_i] == 0) begin                     \
-            clk_r = 1'b1; #(1.0ns);            /* NO-OSC code: ring stalled */ \
+        if (!enable_i || tune_i > TuneOscMax) begin                            \
+            clk_r = 1'b1; #(1.0ns);          /* disabled or NO-OSC: stalled */ \
         end else begin                                                         \
-            half_period = (use_tbl ? hp_tbl[tune_i] * 1ps : 1.0ns + 0.1ns * tune_i) \
-                        + 1ps * ((JitterPs > 0) ? ($random % (JitterPs + 1)) : 0); \
+            half_period = (HpBasePs + HpSlopePs * real'(tune_i)) * 1ps         \
+                        + (((JitterPs > 0) ? (($random % (2*JitterPs + 1)) - JitterPs) : 0) * 1ps); \
             if (half_period < 1ps) half_period = 1ps;                          \
             #(half_period) clk_r = ~clk_r;                                     \
         end                                                                    \
@@ -73,47 +81,63 @@
 
 module ring_dco_binary #(
     parameter int unsigned NumTuneBits = 7,
-    parameter int          JitterPs    = 0,   // +-jitter per half-period, in ps (0 = ideal)
-    parameter string       DcoTable    = "",  // real freq-vs-code lookup (ps); "" = smooth model
+    // Ring law (SPICE-calibrated, typical corner). Binary ring loads a fixed-length ring: half-period
+    // rises with the loaded code, spanning the extracted ~385..135 MHz. (Monotonic approximation; the
+    // real binary ring is non-monotonic -- see header.)
+    parameter real         HpBasePs    = 1300.0, // half-period at tune=0, ps
+    parameter real         HpSlopePs   = 19.0,   // ps added per code
+    parameter int unsigned TuneOscMax  = (1 << NumTuneBits) - 1, // all codes oscillate
+    parameter int          JitterPs    = 0,      // +-ps cycle-to-cycle jitter (0 = noise-free, like cosim)
     parameter string       Target      = "behavioral"   // ignored (structural-DCO interface parity)
 ) (
     input  logic                   enable_i,
     input  logic [NumTuneBits-1:0] tune_i,
     output logic                   clk_o
 );
-    `ADPLL_RING_DCO_BEHAVIOURAL(binary);
+    `ADPLL_RING_DCO_BEHAVIOURAL;
 endmodule
 
 module ring_dco_thermometer #(
     parameter int unsigned NumTuneBits = 7,
-    parameter int          JitterPs    = 0,   // +-jitter per half-period, in ps (0 = ideal)
-    parameter string       DcoTable    = "",  // real freq-vs-code lookup (ps); "" = smooth model
+    // Thermometer ring: unary-weighted load -> clean monotonic curve (the "ideal" variant).
+    parameter real         HpBasePs    = 1300.0,
+    parameter real         HpSlopePs   = 19.0,
+    parameter int unsigned TuneOscMax  = (1 << NumTuneBits) - 1,
+    parameter int          JitterPs    = 0,
     parameter string       Target      = "behavioral"
 ) (
     input  logic                   enable_i,
     input  logic [NumTuneBits-1:0] tune_i,
     output logic                   clk_o
 );
-    `ADPLL_RING_DCO_BEHAVIOURAL(thermometer);
+    `ADPLL_RING_DCO_BEHAVIOURAL;
 endmodule
 
 module ring_dco_muxtap #(
     parameter int unsigned NumTuneBits = 7,
-    parameter int          JitterPs    = 0,   // +-jitter per half-period, in ps (0 = ideal)
-    parameter string       DcoTable    = "",  // real freq-vs-code lookup (ps); "" = smooth model
+    // Mux-tap ring: the code selects where the loop closes (N_stages), so half-period is LINEAR in
+    // tune and the ring stops oscillating past the tap range. Fitted to the extracted ring at the
+    // typical corner: Hp = 1346 + 87.1*tune ps (1.0 ps RMS), oscillating codes 0..50.
+    parameter real         HpBasePs    = 1346.0,
+    parameter real         HpSlopePs   = 87.1,
+    parameter int unsigned TuneOscMax  = 50,     // codes 51..127 do not oscillate (NO-OSC dead zone)
+    parameter int          JitterPs    = 0,
     parameter string       Target      = "behavioral"
 ) (
     input  logic                   enable_i,
     input  logic [NumTuneBits-1:0] tune_i,
     output logic                   clk_o
 );
-    `ADPLL_RING_DCO_BEHAVIOURAL(muxtap);
+    `ADPLL_RING_DCO_BEHAVIOURAL;
 endmodule
 
 module ring_dco_coarsefine #(
     parameter int unsigned NumTuneBits = 7,
-    parameter int          JitterPs    = 0,   // +-jitter per half-period, in ps (0 = ideal)
-    parameter string       DcoTable    = "",  // real freq-vs-code lookup (ps); "" = smooth model
+    // Coarse-fine ring: coarse field (tune high bits) + fine field; monotonic in the integer code.
+    parameter real         HpBasePs    = 1300.0,
+    parameter real         HpSlopePs   = 19.0,
+    parameter int unsigned TuneOscMax  = (1 << NumTuneBits) - 1,
+    parameter int          JitterPs    = 0,
     parameter int unsigned NumFineBits = 3,
     parameter string       Target      = "behavioral"
 ) (
@@ -121,7 +145,7 @@ module ring_dco_coarsefine #(
     input  logic [NumTuneBits-1:0] tune_i,
     output logic                   clk_o
 );
-    `ADPLL_RING_DCO_BEHAVIOURAL(coarsefine);
+    `ADPLL_RING_DCO_BEHAVIOURAL;
 endmodule
 
 `undef ADPLL_RING_DCO_BEHAVIOURAL

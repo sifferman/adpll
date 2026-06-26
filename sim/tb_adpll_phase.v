@@ -9,9 +9,10 @@
 // fraction; the proportionalintegral loop filter drives that phase error to zero. The same adpll_loop_filter_proportionalintegral
 // serves here and in the FLL -- only the error source (detector) and gains differ.
 //
-// 25 MHz reference (40 ns). With the behavioural DCO (half-period 1.0+0.1*tune ns), tune~=20 gives
-// a 6 ns DCO period, so F_DCO/F_ref = 40/6 = 6.667; in Q.PhaseWidth (PhaseWidth=6) that is fcw=427.
-// Reports time-to-lock and the settled tune, PASSing on a sane mid-range code.
+// 25 MHz reference (40 ns). The mux-tap behavioural ring (half-period 1346 + 87.1*tune ps, the
+// SPICE-calibrated law) hits a ~6 ns DCO period near tune~=20, so F_DCO/F_ref = 40/6 = 6.667; in
+// Q.PhaseWidth (PhaseWidth=6) that is fcw=427. Reports time-to-lock and the settled tune, PASSing on
+// a sane mid-range code.
 
 module tb_adpll_phase;
   localparam int unsigned NUM_TUNE = 7;
@@ -34,7 +35,7 @@ module tb_adpll_phase;
   wire signed [ERR_W-1:0] error;
   wire                    valid;
 
-  ring_dco_binary #(.NumTuneBits(NUM_TUNE)) u_dco (
+  ring_dco_muxtap #(.NumTuneBits(NUM_TUNE)) u_dco (
       .enable_i(enable),
       .tune_i  (tune),
       .clk_o   (dco_clk)

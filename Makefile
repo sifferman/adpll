@@ -6,9 +6,13 @@ SHELL := /bin/bash
 # iverilog defaults to 1 s precision and rounds the behavioural #(1.0ns) delays to zero; set a
 # 1ns/1ps default timescale via an iverilog command file (process substitution -- no source stub).
 TS    = -c <(printf '+timescale+1ns/1ps\n')
-# Optional iverilog defines for the behavioural sims: `make sim-adpll VCD=1 JITTER_PS=200`
-# VCD=1 dumps a .vcd (GTKWave); JITTER_PS=<n> adds +-n ps DCO half-period jitter.
-SIM_DEFS = $(if $(VCD),-DVCD,) $(if $(JITTER_PS),-DJITTER_PS=$(JITTER_PS),)
+# Optional iverilog defines for the behavioural sims:
+#   make sim-adpll VCD=1 JITTER_PS=200 GEAR_MAXGEAR=2
+# VCD=1 dumps a .vcd (GTKWave); JITTER_PS=<n> adds +-n ps DCO cycle-to-cycle jitter; GEAR_MAXGEAR=<n>
+# sets the gear-shift start gear (step 1<<n) -- e.g. GEAR_MAXGEAR=5 reproduces the over-large-step
+# railing study on the muxtap ring.
+SIM_DEFS = $(if $(VCD),-DVCD,) $(if $(JITTER_PS),-DJITTER_PS=$(JITTER_PS),) \
+           $(if $(GEAR_MAXGEAR),-DGEAR_MAXGEAR=$(GEAR_MAXGEAR),)
 # Shared core + all loop filters + the sim-only behavioural DCOs (single-PLL testbench picks one of
 # each via plusdefines). The DCO boundary: sims use sim/ring_dco_behavioral.sv (a fast #-delay clock,
 # stock Icarus, no PDK), NOT the structural rtl/dco/ + rtl/tech_cells/ (those are for synthesis/SPICE,
