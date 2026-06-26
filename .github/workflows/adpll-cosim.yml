@@ -66,6 +66,17 @@ jobs:
           ADPLL: ${{ matrix.adpll }}
           CORNER: ${{ matrix.corner }}
         run: |
+          # The devshell toolchain is fetched from binary caches; cache.nixos.org intermittently
+          # returns transient network errors (HTTP 416 / dropped connections) that fail the devshell
+          # *build* -- which kills the cell in ~1-2 min, long before the ~25-min sim, and is unrelated
+          # to the design. Warm the devshell first with a few retries (cheap: it only realises store
+          # paths) so a cache hiccup retries instead of failing the cell; the cosim then runs once
+          # against the already-built shell. A genuine NO-LOCK still fails the single make below.
+          for attempt in 1 2 3 4 5; do
+            nix develop --accept-flake-config --command true && break
+            echo "::warning::devshell build attempt $attempt failed (likely transient cache error); retrying in 30s"
+            sleep 30
+          done
           nix develop --accept-flake-config --command bash -ceu '
             ciel enable 019cf7a3e0de79bb0e4b6213758882d283c65816 \
               --pdk-root "$PWD/.pdk" --pdk-family gf180mcuD --include-libraries all
