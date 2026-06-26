@@ -6,6 +6,9 @@ SHELL := /bin/bash
 # iverilog defaults to 1 s precision and rounds the behavioural #(1.0ns) delays to zero; set a
 # 1ns/1ps default timescale via an iverilog command file (process substitution -- no source stub).
 TS    = -c <(printf '+timescale+1ns/1ps\n')
+# Optional iverilog defines for the behavioural sims: `make sim-adpll VCD=1 JITTER_PS=200`
+# VCD=1 dumps a .vcd (GTKWave); JITTER_PS=<n> adds +-n ps DCO half-period jitter.
+SIM_DEFS = $(if $(VCD),-DVCD,) $(if $(JITTER_PS),-DJITTER_PS=$(JITTER_PS),)
 # Shared core + all loop filters + the sim-only behavioural DCOs (single-PLL testbench picks one of
 # each via plusdefines). The DCO boundary: sims use sim/ring_dco_behavioral.sv (a fast #-delay clock,
 # stock Icarus, no PDK), NOT the structural rtl/dco/ + rtl/tech_cells/ (those are for synthesis/SPICE,
@@ -22,7 +25,7 @@ help: ## List targets
 
 sim-adpll: ## Standalone digital ADPLL: ring DCO (behavioural) + FLL lock (iverilog, no PDK)
 	@mkdir -p sim_build
-	iverilog -g2012 -o sim_build/tb_adpll $(TS) $(CORE) sim/tb_adpll.v
+	iverilog -g2012 $(SIM_DEFS) -o sim_build/tb_adpll $(TS) $(CORE) sim/tb_adpll.v
 	vvp sim_build/tb_adpll
 
 sim-adpll-survey: ## Compare the FLL loop filters (bang-bang / proportional-integral / gearshift): lock time + code
@@ -50,7 +53,7 @@ sim-adpll-matrix: ## All 12 FLL variants (3 loop filters x 4 DCOs): lock time + 
 
 sim-adpll-phase: ## Phase-domain ADPLL (TDC + reference/variable phase accumulators): true phase lock
 	@mkdir -p sim_build
-	iverilog -g2012 -o sim_build/tb_adpll_phase $(TS) \
+	iverilog -g2012 $(SIM_DEFS) -o sim_build/tb_adpll_phase $(TS) \
 		rtl/adpll_freq_counter.sv rtl/adpll_lock_detector.sv sim/adpll_tdc_behavioral.sv rtl/adpll_phase_detector.sv \
 		rtl/loop_filter/adpll_loop_filter_proportionalintegral.sv sim/ring_dco_behavioral.sv sim/tb_adpll_phase.v
 	vvp sim_build/tb_adpll_phase | grep -E "LOCKED|PASS|FAIL"

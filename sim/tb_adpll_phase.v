@@ -86,6 +86,14 @@ module tb_adpll_phase;
 
   integer cycles = 0, enable_cycle = 0;
 
+`ifdef VCD
+  // -DVCD: dump all signals (phase accumulators, tdc_phase, tune, lock, dco_clk, ...) for GTKWave.
+  initial begin
+    $dumpfile("tb_adpll_phase.vcd");
+    $dumpvars(0, tb_adpll_phase);
+  end
+`endif
+
   always @(posedge clk) begin
     cycles = cycles + 1;
     if (lock) begin

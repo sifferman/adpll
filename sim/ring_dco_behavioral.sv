@@ -39,23 +39,42 @@
 //
 // half_period = 1.0ns + 0.1ns*tune_i (illustrative); >= 1.0ns > 0 so there is never a zero-delay
 // loop. The numbers are not the silicon curve -- SPICE gives that.
+//
+// JitterPs: optional per-half-period timing jitter, uniform in +-JitterPs picoseconds (default 0 =
+// ideal clock). This models the analog ring's cycle-to-cycle jitter, which adds noise to the freq
+// detector's edge count -- the effect the smooth ideal model lacks. Used to study how the loop
+// filters tolerate a noisy DCO (e.g. why gearshift, with no integrator to average the noisy error
+// sign, degrades on a jittery ring while the integrating bang-bang does not).
 
-`define ADPLL_RING_DCO_BEHAVIOURAL(NAME)           \
-    logic    clk_r = 1'b1;                         \
-    realtime half_period;                          \
-    always begin                                   \
-        if (enable_i) begin                        \
-            half_period = 1.0ns + 0.1ns * tune_i;  \
-            #(half_period) clk_r = ~clk_r;         \
-        end else begin                             \
-            clk_r = 1'b1;                          \
-            #(1.0ns);                              \
-        end                                        \
-    end                                            \
+// DcoTable: optional path to a $readmemh half-period(ps) lookup (128 codes) from the real extracted-
+// ring SPICE sweep (sim/dco_table_from_sweep.py). When set, the ring REPLAYS the measured freq-vs-code
+// -- multi-mode non-monotonicity, steep regions, and NO-OSC dead codes (table entry 0 = ring stalled)
+// -- so the behavioural sim behaves like the cosim. When empty (default), the smooth illustrative
+// curve (1.0+0.1*tune ns) is used.
+`define ADPLL_RING_DCO_BEHAVIOURAL(NAME)                                       \
+    logic    clk_r = 1'b1;                                                     \
+    realtime half_period;                                                      \
+    integer  hp_tbl [0:(1<<NumTuneBits)-1];                                    \
+    integer  use_tbl = 0;                                                      \
+    initial if (DcoTable != "") begin $readmemh(DcoTable, hp_tbl); use_tbl = 1; end \
+    always begin                                                              \
+        if (!enable_i) begin                                                   \
+            clk_r = 1'b1; #(1.0ns);                                            \
+        end else if (use_tbl && hp_tbl[tune_i] == 0) begin                     \
+            clk_r = 1'b1; #(1.0ns);            /* NO-OSC code: ring stalled */ \
+        end else begin                                                         \
+            half_period = (use_tbl ? hp_tbl[tune_i] * 1ps : 1.0ns + 0.1ns * tune_i) \
+                        + 1ps * ((JitterPs > 0) ? ($random % (JitterPs + 1)) : 0); \
+            if (half_period < 1ps) half_period = 1ps;                          \
+            #(half_period) clk_r = ~clk_r;                                     \
+        end                                                                    \
+    end                                                                        \
     assign clk_o = clk_r
 
 module ring_dco_binary #(
     parameter int unsigned NumTuneBits = 7,
+    parameter int          JitterPs    = 0,   // +-jitter per half-period, in ps (0 = ideal)
+    parameter string       DcoTable    = "",  // real freq-vs-code lookup (ps); "" = smooth model
     parameter string       Target      = "behavioral"   // ignored (structural-DCO interface parity)
 ) (
     input  logic                   enable_i,
@@ -67,6 +86,8 @@ endmodule
 
 module ring_dco_thermometer #(
     parameter int unsigned NumTuneBits = 7,
+    parameter int          JitterPs    = 0,   // +-jitter per half-period, in ps (0 = ideal)
+    parameter string       DcoTable    = "",  // real freq-vs-code lookup (ps); "" = smooth model
     parameter string       Target      = "behavioral"
 ) (
     input  logic                   enable_i,
@@ -78,6 +99,8 @@ endmodule
 
 module ring_dco_muxtap #(
     parameter int unsigned NumTuneBits = 7,
+    parameter int          JitterPs    = 0,   // +-jitter per half-period, in ps (0 = ideal)
+    parameter string       DcoTable    = "",  // real freq-vs-code lookup (ps); "" = smooth model
     parameter string       Target      = "behavioral"
 ) (
     input  logic                   enable_i,
@@ -89,6 +112,8 @@ endmodule
 
 module ring_dco_coarsefine #(
     parameter int unsigned NumTuneBits = 7,
+    parameter int          JitterPs    = 0,   // +-jitter per half-period, in ps (0 = ideal)
+    parameter string       DcoTable    = "",  // real freq-vs-code lookup (ps); "" = smooth model
     parameter int unsigned NumFineBits = 3,
     parameter string       Target      = "behavioral"
 ) (

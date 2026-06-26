@@ -13,13 +13,24 @@
 // and a 25 MHz reference, mul=1707/div=256 targets tune ~= 20. Reports time-to-lock and the
 // settled tune code, and PASSes if it locks in a sane mid-range code.
 
+`ifndef JITTER_PS
+  `define JITTER_PS 0    // DCO per-half-period jitter in ps; override with -DJITTER_PS=<n>
+`endif
+`ifndef DCO_TABLE
+  `define DCO_TABLE ""   // real freq-vs-code lookup (ps) from SPICE; -DDCO_TABLE=\"file.mem\" to use it
+`endif
+// Freq-detector target/window + reference period -- override to match the cosim FLL operating point
+// (e.g. -DMUL_VAL=12 -DDIV_VAL=8 -DCLK_HALF=2.5 reproduces the 300 MHz @ 200 MHz-ref small-window case).
+`ifndef MUL_VAL  `define MUL_VAL  1707 `endif
+`ifndef DIV_VAL  `define DIV_VAL  256  `endif
+`ifndef CLK_HALF `define CLK_HALF 20   `endif
 module tb_adpll;
   localparam int unsigned NUM_TUNE = 7;
   localparam int unsigned CNT_W    = 24;        // EdgeCountWidth (mul width)
   localparam int unsigned DIV_W    = 16;        // WindowSizeWidth (div width)
   localparam int unsigned ERR_W    = CNT_W + 2; // adpll_freq_detector.ErrorWidth
-  localparam int unsigned MUL      = 1707;      // target DCO edges per window (N)
-  localparam int unsigned DIV      = 256;       // window length in ref cycles (M)
+  localparam int unsigned MUL      = `MUL_VAL;  // target DCO edges per window (N)
+  localparam int unsigned DIV      = `DIV_VAL;  // window length in ref cycles (M)
 
   // bang-bang/gearshift lock on a clean code (+-1 LSB); the proportionalintegral dithers a little more.
 `ifdef CTRL_PROPORTIONALINTEGRAL
@@ -29,7 +40,7 @@ module tb_adpll;
 `endif
 
   reg clk = 1'b0;
-  always #(20ns) clk = ~clk;          // 25 MHz reference (40 ns)
+  always #(`CLK_HALF * 1ns) clk = ~clk;   // reference half-period (default 20 ns = 25 MHz)
 
   reg rst_n  = 1'b1;
   reg enable = 1'b0;
@@ -42,13 +53,13 @@ module tb_adpll;
   wire                    valid;
 
 `ifdef DCO_THERM
-  ring_dco_thermometer #(.NumTuneBits(NUM_TUNE)) u_dco (
+  ring_dco_thermometer #(.NumTuneBits(NUM_TUNE), .JitterPs(`JITTER_PS), .DcoTable(`DCO_TABLE)) u_dco (
 `elsif DCO_MUXTAP
-  ring_dco_muxtap #(.NumTuneBits(NUM_TUNE)) u_dco (
+  ring_dco_muxtap #(.NumTuneBits(NUM_TUNE), .JitterPs(`JITTER_PS), .DcoTable(`DCO_TABLE)) u_dco (
 `elsif DCO_COARSEFINE
-  ring_dco_coarsefine #(.NumTuneBits(NUM_TUNE)) u_dco (
+  ring_dco_coarsefine #(.NumTuneBits(NUM_TUNE), .JitterPs(`JITTER_PS), .DcoTable(`DCO_TABLE)) u_dco (
 `else
-  ring_dco_binary #(.NumTuneBits(NUM_TUNE)) u_dco (
+  ring_dco_binary #(.NumTuneBits(NUM_TUNE), .JitterPs(`JITTER_PS), .DcoTable(`DCO_TABLE)) u_dco (
 `endif
       .enable_i(enable),
       .tune_i  (tune),
@@ -92,6 +103,14 @@ module tb_adpll;
   );
 
   integer cycles = 0, enable_cycle = 0;
+
+`ifdef VCD
+  // -DVCD: dump all signals (tune, integral/gear, error, lock, dco_clk, ...) for GTKWave.
+  initial begin
+    $dumpfile("tb_adpll.vcd");
+    $dumpvars(0, tb_adpll);
+  end
+`endif
 
 `ifdef TRACE
   reg [NUM_TUNE-1:0] tune_prev = {NUM_TUNE{1'b1}};
