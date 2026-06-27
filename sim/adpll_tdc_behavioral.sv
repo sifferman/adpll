@@ -39,7 +39,9 @@ module adpll_tdc_flash #(
     // Accepted for interface parity with the structural TDC; this ideal $realtime model normalises to
     // one DCO period regardless, so the delay-line sizing knob has no effect here (it sets the real
     // full-scale, which only the extracted/SPICE TDC exposes).
-    parameter int unsigned DelayCellsBetweenSamples = 1
+    parameter int unsigned DelayCellsBetweenSamples = 1,
+    // Match the structural TDC's snapshot decimation so sim sees the same (decimated) phase-update rate.
+    parameter int unsigned SampleEveryN             = 1
 ) (
     input  logic                  clk_i,
     input  logic                  rst_ni,
@@ -66,12 +68,22 @@ always @(posedge dco_clk_i) begin
         dco_period = dco_rise_time - dco_rise_prev;
 end
 
+// Sample-enable: pulse once every SampleEveryN reference cycles, matching the structural TDC so the
+// behavioural sim reproduces the same decimated phase-update rate the loop sees in silicon.
+localparam int unsigned SampDivW = (SampleEveryN <= 1) ? 1 : $clog2(SampleEveryN);
+logic [SampDivW-1:0] sample_cnt;
+logic                sample_en;
+always @(posedge clk_i or negedge rst_ni)
+    if (!rst_ni) sample_cnt <= '0;
+    else sample_cnt <= (sample_cnt == SampDivW'(SampleEveryN - 1)) ? '0 : (sample_cnt + SampDivW'(1));
+assign sample_en = (SampleEveryN <= 1) ? 1'b1 : (sample_cnt == '0);
+
 logic [PhaseWidth-1:0] phase_q;
 real frac_real;
 always @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
         phase_q <= '0;
-    end else begin
+    end else if (sample_en) begin
         frac_real = (dco_period > 0.0) ? ($realtime - dco_rise_time) / dco_period : 0.0;
         if (frac_real < 0.0)   frac_real = 0.0;
         if (frac_real > 0.999) frac_real = 0.999;

@@ -59,7 +59,14 @@
 
 module adpll_tdc_flash #(
     parameter int unsigned PhaseWidth               = 6,
-    parameter int unsigned DelayCellsBetweenSamples = 1
+    parameter int unsigned DelayCellsBetweenSamples = 1,
+    // Decimate the snapshot + decode to once every SampleEveryN reference cycles. The decode below is
+    // a deep combinational chain (a NumPhaseUnits-wide priority encode plus a divide); on a fast
+    // reference clock it cannot settle in one cycle. Snapshotting every SampleEveryN cycles gives it
+    // SampleEveryN cycles to settle before phase_o is re-registered, so the timing path is a valid
+    // SampleEveryN-cycle multicycle (declare it in the SDC). The phase loop bandwidth is far below the
+    // reference rate, so a slower phase update is harmless. SampleEveryN=1 = original every-cycle behaviour.
+    parameter int unsigned SampleEveryN             = 1
 ) (
     input  logic                  clk_i,
     input  logic                  rst_ni,
@@ -84,11 +91,21 @@ for (genvar i_GEN = 0; i_GEN < NumDelayCells; i_GEN++) begin : delay_line
     );
 end
 
-// Sample the phase-unit boundaries (every DelayCellsBetweenSamples-th node) on the reference edge.
+// Sample-enable: pulse once every SampleEveryN reference cycles (always 1 when SampleEveryN<=1).
+localparam int unsigned SampDivW = (SampleEveryN <= 1) ? 1 : $clog2(SampleEveryN);
+logic [SampDivW-1:0] sample_cnt;
+logic                sample_en;
+always_ff @(posedge clk_i or negedge rst_ni)
+    if (!rst_ni) sample_cnt <= '0;
+    else sample_cnt <= (sample_cnt == SampDivW'(SampleEveryN - 1)) ? '0 : (sample_cnt + SampDivW'(1));
+assign sample_en = (SampleEveryN <= 1) ? 1'b1 : (sample_cnt == '0);
+
+// Sample the phase-unit boundaries (every DelayCellsBetweenSamples-th node) on the reference edge,
+// decimated by sample_en so the combinational decode below has SampleEveryN cycles to settle.
 logic [NumPhaseUnits-1:0] sampled;
 always_ff @(posedge clk_i or negedge rst_ni)
     if (!rst_ni) sampled <= '0;
-    else for (int u = 0; u < NumPhaseUnits; u++)
+    else if (sample_en) for (int u = 0; u < NumPhaseUnits; u++)
         sampled[u] <= tap[(u + 1) * DelayCellsBetweenSamples];
 
 // Self-normalising decode. Going down the line (back in time) each DCO rising edge is a 1->0 boundary
@@ -120,7 +137,21 @@ always_comb begin
     period = found_second ? ({1'b0, second} - {1'b0, frac}) : (PhaseWidth + 1)'(NumPhaseUnits);
     numer  = {{PhaseWidth{1'b0}}, frac} << PhaseWidth;
 end
-assign phase_o = (period == 0) ? '0 : PhaseWidth'(numer / period);
-assign period_valid_o = found_second;   // two rising edges captured => a full DCO period fits the line
+// Combinational decode of the current snapshot...
+logic [PhaseWidth-1:0] phase_comb;
+assign phase_comb = (period == 0) ? '0 : PhaseWidth'(numer / period);
+
+// ...re-registered only on sample_en, i.e. after SampleEveryN cycles of settling from the snapshot.
+// The path sampled -> {phase_o, period_valid_o} is therefore a SampleEveryN-cycle multicycle (see
+// chip_top.sdc); only settled values are presented to the phase detector. (SampleEveryN=1 captures
+// every cycle, matching the original combinational behaviour after one pipeline register.)
+always_ff @(posedge clk_i or negedge rst_ni)
+    if (!rst_ni) begin
+        phase_o        <= '0;
+        period_valid_o <= 1'b0;
+    end else if (sample_en) begin
+        phase_o        <= phase_comb;
+        period_valid_o <= found_second;   // two rising edges captured => a full DCO period fits the line
+    end
 
 endmodule

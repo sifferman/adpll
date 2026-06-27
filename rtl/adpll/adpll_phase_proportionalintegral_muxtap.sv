@@ -57,6 +57,7 @@ module adpll_phase_proportionalintegral_muxtap #(
     parameter  int unsigned DcoNumTuneBits                 = 7,
     parameter  int unsigned TdcPhaseWidth                  = 6,
     parameter  int unsigned TdcDelayCellsBetweenSamples    = 1,
+    parameter  int unsigned TdcSampleEveryN                = 1,
     parameter  int unsigned PhaseDetectorMaxEdgesPerWindow = (1 << 12) - 1,
     parameter  int unsigned PhaseDetectorFcwWidth          = 24,
     parameter  int unsigned PhaseDetectorErrorWidth        = 24,
@@ -92,7 +93,8 @@ wire                                      dco_clk;
 // $realtime model in iverilog -- same module name, file picked at build time, like the DCO).
 adpll_tdc_flash #(
     .PhaseWidth(TdcPhaseWidth),
-    .DelayCellsBetweenSamples(TdcDelayCellsBetweenSamples)
+    .DelayCellsBetweenSamples(TdcDelayCellsBetweenSamples),
+    .SampleEveryN(TdcSampleEveryN)
 ) adpll_tdc_flash (
     .clk_i    (clk_i),
     .rst_ni   (rst_ni),
