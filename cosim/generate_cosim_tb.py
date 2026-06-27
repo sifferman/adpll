@@ -70,6 +70,10 @@ run
 meas tran t_lock when v(lock_a)={vth:.3f} rise=1 td=65n
 meas tran lock_avg avg v(lock_a) from={lock_from:.1f}n to={lock_check:.1f}n
 meas tran f_per trig v(dco_clk) val={vth:.3f} rise=2 td={lock_from:.1f}n targ v(dco_clk) val={vth:.3f} rise=32 td={lock_from:.1f}n
+* Dump the digital loop nodes (d_cosim / adc XSPICE event nodes) to a VCD: the tune bits, lock, the
+* digitised DCO clock and the reference clock. sim/vcd_add_freq.py then injects real dco/ref frequency
+* traces from the dco_d/clk_d posedges. Viewable in GTKWave/Surfer.
+eprvcd tune_6 tune_5 tune_4 tune_3 tune_2 tune_1 tune_0 lock_o dco_d clk_d > cosim.vcd
 .endc
 .end"""
 
@@ -137,6 +141,10 @@ run
 meas tran t_lock when v(lock_a)={vth:.3f} rise=1 td=65n
 meas tran lock_avg avg v(lock_a) from={lock_from:.1f}n to={lock_check:.1f}n
 meas tran f_per trig v(dco_clk) val={vth:.3f} rise=2 td={lock_from:.1f}n targ v(dco_clk) val={vth:.3f} rise=32 td={lock_from:.1f}n
+* Dump the digital loop nodes (d_cosim / adc XSPICE event nodes) to a VCD: the tune bits, lock, the
+* digitised DCO clock and the reference clock. sim/vcd_add_freq.py then injects real dco/ref frequency
+* traces from the dco_d/clk_d posedges. Viewable in GTKWave/Surfer.
+eprvcd tune_6 tune_5 tune_4 tune_3 tune_2 tune_1 tune_0 lock_o dco_d clk_d > cosim.vcd
 .endc
 .end"""
 

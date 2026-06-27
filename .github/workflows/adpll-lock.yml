@@ -27,3 +27,13 @@ jobs:
           make sim-adpll-matrix | tee matrix.txt
           { echo '### ADPLL behavioral lock (3 filters x 4 DCOs)'; echo '```'; cat matrix.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           if grep -qE "NO-LOCK|FAIL" matrix.txt; then echo "::error::a config failed to lock"; exit 1; fi
+      - name: Dump waveform (gearshift+muxtap @300MHz, with freq traces)
+        if: always()
+        run: make sim-adpll-vcd || echo "::warning::VCD dump skipped"
+      - name: Upload waveforms
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: behavioral-vcd
+          path: sim_build/*.vcd
+          if-no-files-found: ignore

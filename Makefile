@@ -23,7 +23,7 @@ SIM_DEFS = $(if $(VCD),-DVCD,) $(if $(JITTER_PS),-DJITTER_PS=$(JITTER_PS),) \
 CORE  = $(wildcard rtl/*.sv rtl/loop_filter/*.sv) \
         sim/ring_dco_behavioral.sv sim/adpll_tdc_behavioral.sv
 
-.PHONY: help sim-adpll sim-adpll-survey sim-adpll-matrix sim-adpll-phase sim-adpll-csr clean
+.PHONY: help sim-adpll sim-adpll-survey sim-adpll-matrix sim-adpll-vcd sim-adpll-phase sim-adpll-csr clean
 help: ## List targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-20s %s\n",$$1,$$2}'
 
@@ -54,6 +54,13 @@ sim-adpll-matrix: ## All 12 FLL variants (3 loop filters x 4 DCOs): lock time + 
 			printf "%-30s %-10s %-6s %s\n" "$$cn x $$dn" "$${cyc:-N/A}" "$${tune:-N/A}" "$${res:-NO-LOCK}"; \
 		done; \
 	done
+
+sim-adpll-vcd: ## Behavioural gearshift+muxtap @300MHz VCD (the cosim operating point) + dco/ref freq traces
+	@mkdir -p sim_build
+	iverilog -g2012 -DCTRL_GEARSHIFT -DDCO_MUXTAP -DMUL_VAL=12 -DDIV_VAL=8 -DCLK_HALF=2.5 -DVCD \
+		-o sim_build/tb_adpll_vcd $(TS) $(CORE) sim/tb_adpll.v
+	cd sim_build && vvp tb_adpll_vcd
+	python3 sim/vcd_add_freq.py sim_build/tb_adpll.vcd sim_build/tb_adpll_freq.vcd --dco dco_clk --ref clk
 
 sim-adpll-phase: ## Phase-domain ADPLL (TDC + reference/variable phase accumulators): true phase lock
 	@mkdir -p sim_build
