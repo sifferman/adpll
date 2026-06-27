@@ -64,19 +64,19 @@
 // edge counter's clock-domain-crossing synchroniser) is what let an over-large gear-shift step
 // overshoot into the rail, and that is not modelled by a free-running DCO. The gate-level cosim
 // remains the sign-off environment.
-`define ADPLL_RING_DCO_BEHAVIOURAL                                             \
-    logic    clk_r = 1'b1;                                                     \
-    realtime half_period;                                                      \
-    always begin                                                              \
-        if (!enable_i || tune_i > TuneOscMax) begin                            \
-            clk_r = 1'b1; #(1.0ns);          /* disabled or NO-OSC: stalled */ \
-        end else begin                                                         \
-            half_period = (HpBasePs + HpSlopePs * real'(tune_i)) * 1ps         \
+`define ADPLL_RING_DCO_BEHAVIOURAL                                                                  \
+    logic    clk_r = 1'b1;                                                                          \
+    realtime half_period;                                                                           \
+    always begin                                                                                    \
+        if (!enable_i || tune_i > TuneOscMax) begin                                                 \
+            clk_r = 1'b1; #(1.0ns);          /* disabled or NO-OSC: stalled */                      \
+        end else begin                                                                              \
+            half_period = (HpBasePs + HpSlopePs * real'(tune_i)) * 1ps                              \
                         + (((JitterPs > 0) ? (($random % (2*JitterPs + 1)) - JitterPs) : 0) * 1ps); \
-            if (half_period < 1ps) half_period = 1ps;                          \
-            #(half_period) clk_r = ~clk_r;                                     \
-        end                                                                    \
-    end                                                                        \
+            if (half_period < 1ps) half_period = 1ps;                                               \
+            #(half_period) clk_r = ~clk_r;                                                          \
+        end                                                                                         \
+    end                                                                                             \
     assign clk_o = clk_r
 
 module ring_dco_binary #(
