@@ -116,7 +116,16 @@ logic [EdgeCountWidth-1:0]  count_at_window_start_d, count_at_window_start_q; //
 logic [EdgeCountWidth-1:0]  dco_edge_count_d,        dco_edge_count_q;
 logic                       sample_valid_d,          sample_valid_q;
 
-wire window_tick = (window_cycle_count_q >= window_length_i - 1'b1);
+// Clamp the window to >= 2 reference cycles. A 1-cycle (or 0) window is non-functional -- you cannot
+// measure a DCO/clk frequency ratio from a single reference cycle (the edge count would be 0..~1, no
+// resolution). Guaranteeing window_eff >= 2 means sample_valid_o can never fire on two consecutive
+// clk_i cycles, which makes the downstream loop-filter tune accumulator a provably-valid >=2-cycle
+// multicycle path (it is stable for the whole window between updates) -- independent of whatever the
+// CSR programs. Costs nothing real; it only forbids a degenerate setting.
+wire [WindowSizeWidth-1:0] window_eff = (window_length_i < WindowSizeWidth'(2))
+                                      ? WindowSizeWidth'(2) : window_length_i;
+
+wire window_tick = (window_cycle_count_q >= window_eff - 1'b1);
 
 always_comb begin
     window_cycle_count_d    = window_cycle_count_q + 1'b1;
